@@ -108,3 +108,94 @@ export function ShareIcon(props: IconProps) {
     </svg>
   );
 }
+
+export function SearchIcon(props: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true" {...props}>
+      <circle cx="10.5" cy="10.5" r="7" />
+      <path d="M21 21l-5.2-5.2" />
+    </svg>
+  );
+}
+
+export function SettingsIcon(props: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" {...props}>
+      <path d="M12 8a4 4 0 100 8 4 4 0 000-8zm0 6.2a2.2 2.2 0 110-4.4 2.2 2.2 0 010 4.4z" />
+      <path d="M20.6 13.1l-1.4-.8a7.6 7.6 0 000-2.6l1.4-.8a1 1 0 00.4-1.3l-1.5-2.6a1 1 0 00-1.3-.4l-1.4.8a7.5 7.5 0 00-2.2-1.3V2.6a1 1 0 00-1-1h-3a1 1 0 00-1 1v1.5c-.8.3-1.6.7-2.2 1.3l-1.4-.8a1 1 0 00-1.3.4L3.2 7.6a1 1 0 00.4 1.3l1.4.8a7.6 7.6 0 000 2.6l-1.4.8a1 1 0 00-.4 1.3l1.5 2.6a1 1 0 001.3.4l1.4-.8c.6.6 1.4 1 2.2 1.3v1.5a1 1 0 001 1h3a1 1 0 001-1v-1.5c.8-.3 1.6-.7 2.2-1.3l1.4.8a1 1 0 001.3-.4l1.5-2.6a1 1 0 00-.4-1.3z" opacity=".999" />
+    </svg>
+  );
+}
+
+export function ArrowLeftIcon(props: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" {...props}>
+      <path d="M20 11H7.4l5.3-5.3-1.4-1.4L3.6 12l7.7 7.7 1.4-1.4L7.4 13H20z" />
+    </svg>
+  );
+}
+
+export function SunIcon(props: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true" {...props}>
+      <circle cx="12" cy="12" r="4.2" />
+      <path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.1 5.1l1.4 1.4M17.5 17.5l1.4 1.4M18.9 5.1l-1.4 1.4M6.5 17.5l-1.4 1.4" />
+    </svg>
+  );
+}
+
+export function MoonIcon(props: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" {...props}>
+      <path d="M21 14.2A9 9 0 019.8 3 9 9 0 1021 14.2z" />
+    </svg>
+  );
+}
+
+export function ComposeIcon(props: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" {...props}>
+      <path d="M20.7 5.3l-2-2a1 1 0 00-1.4 0L15.6 5 19 8.4l1.7-1.7a1 1 0 000-1.4zM14.2 6.4L4 16.6V20h3.4L17.6 9.8 14.2 6.4z" />
+    </svg>
+  );
+}
+
+export function MediaIcon(props: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" {...props}>
+      <path d="M19 3H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2V5a2 2 0 00-2-2zm0 16H5v-2.6l3.5-3.5 3 3 4-4L19 15.4V19zM8.5 10a1.8 1.8 0 110-3.6 1.8 1.8 0 010 3.6z" />
+    </svg>
+  );
+}
+
+export function PollIcon(props: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" {...props}>
+      <path d="M6 20H3V10h3v10zm7.5 0h-3V4h3v16zm7.5 0h-3v-7h3v7z" />
+    </svg>
+  );
+}
+
+export function EmojiIcon(props: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" {...props}>
+      <path d="M12 2a10 10 0 100 20 10 10 0 000-20zm0 18a8 8 0 110-16 8 8 0 010 16zM8.9 9.9a1.3 1.3 0 112.6 0 1.3 1.3 0 01-2.6 0zm3.6 0a1.3 1.3 0 112.6 0 1.3 1.3 0 01-2.6 0zM12 17.2c-2.2 0-4-1.4-4.5-3.2h9c-.5 1.8-2.3 3.2-4.5 3.2z" />
+    </svg>
+  );
+}
+
+export function ScheduleIcon(props: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" {...props}>
+      <path d="M12 2a10 10 0 100 20 10 10 0 000-20zm0 18a8 8 0 110-16 8 8 0 010 16zm.9-12.5h-1.8v5.2l4.1 2.5.9-1.5-3.2-1.9V7.5z" />
+    </svg>
+  );
+}
+
+export function VerifiedIcon(props: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" {...props}>
+      <path d="M22.3 12l-2.2-2.6.3-3.4-3.3-.8-1.8-2.9L12 3.6 8.7 2.3 6.9 5.2l-3.3.8.3 3.4L1.7 12l2.2 2.6-.3 3.4 3.3.8 1.8 2.9 3.3-1.3 3.3 1.3 1.8-2.9 3.3-.8-.3-3.4L22.3 12zm-11.6 4.4l-3.5-3.5 1.5-1.5 2 2 4.6-4.6 1.5 1.5-6.1 6.1z" />
+    </svg>
+  );
+}

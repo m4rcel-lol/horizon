@@ -5,7 +5,8 @@ COPY package.json pnpm-workspace.yaml turbo.json ./
 COPY packages ./packages
 COPY apps/worker ./apps/worker
 RUN pnpm install --frozen-lockfile || pnpm install
-RUN pnpm --filter @horizon/worker build || true
+RUN pnpm --filter @horizon/database generate
+RUN pnpm turbo run build --filter=@horizon/worker...
 
 FROM node:20-alpine
 WORKDIR /app

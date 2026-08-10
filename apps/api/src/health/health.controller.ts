@@ -3,9 +3,19 @@ import { SOFTWARE_NAME, SOFTWARE_VERSION } from "@horizon/shared";
 
 @Controller("health")
 export class HealthController {
+  // Two @Get decorators on one method do not register two routes — the outer
+  // one overwrites the path, so /health/live used to 404. Declare both.
   @Get()
-  @Get("live")
   live() {
+    return this.liveness();
+  }
+
+  @Get("live")
+  liveAlias() {
+    return this.liveness();
+  }
+
+  private liveness() {
     return {
       status: "ok",
       software: SOFTWARE_NAME,

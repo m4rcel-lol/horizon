@@ -6,8 +6,11 @@ COPY package.json pnpm-workspace.yaml turbo.json ./
 COPY packages ./packages
 COPY apps/api ./apps/api
 RUN pnpm install --frozen-lockfile || pnpm install
-RUN pnpm --filter @horizon/database generate || true
-RUN pnpm --filter @horizon/api build || true
+RUN pnpm --filter @horizon/database generate
+# turbo builds the workspace dependencies (@horizon/shared, @horizon/config)
+# first. A failure here fails the image rather than producing one with no
+# dist/main.js to run.
+RUN pnpm turbo run build --filter=@horizon/api...
 
 # Runtime
 FROM node:20-alpine

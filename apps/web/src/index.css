@@ -2,35 +2,264 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+ * Palette follows the current X visual language: a monochrome primary action
+ * (white pill on black, black pill on white), blue reserved for links, active
+ * state and focus, and near-neutral greys for chrome.
+ */
 :root {
+  color-scheme: light;
+
   --color-primary: #1d9bf0;
   --color-primary-hover: #1a8cd8;
+  --color-primary-soft: rgba(29, 155, 240, 0.1);
+
   --color-bg: #ffffff;
   --color-bg-secondary: #f7f9f9;
+  --color-bg-elevated: #ffffff;
+
   --color-text: #0f1419;
   --color-text-secondary: #536471;
+
   --color-border: #eff3f4;
+  --color-border-strong: #cfd9de;
+
+  --color-hover: rgba(15, 20, 25, 0.1);
+  --color-row-hover: rgba(0, 0, 0, 0.03);
+  --color-scrim: rgba(255, 255, 255, 0.85);
+
+  /* Primary action: monochrome, inverted against the page */
+  --color-btn: #0f1419;
+  --color-btn-text: #ffffff;
+  --color-btn-hover: #272c30;
+
+  --color-danger: #f4212e;
+  --color-success: #00ba7c;
+
   --radius: 9999px;
 }
 
 .dark {
+  color-scheme: dark;
+
   --color-bg: #000000;
   --color-bg-secondary: #16181c;
+  --color-bg-elevated: #16181c;
+
   --color-text: #e7e9ea;
   --color-text-secondary: #71767b;
+
   --color-border: #2f3336;
+  --color-border-strong: #3e4144;
+
+  --color-hover: rgba(231, 233, 234, 0.1);
+  --color-row-hover: rgba(255, 255, 255, 0.03);
+  --color-scrim: rgba(0, 0, 0, 0.65);
+
+  --color-btn: #eff3f4;
+  --color-btn-text: #0f1419;
+  --color-btn-hover: #d7dbdc;
+}
+
+html {
+  background: var(--color-bg);
 }
 
 body {
   margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-family: "TwitterChirp", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-size: 15px;
+  line-height: 1.3125;
   background: var(--color-bg);
   color: var(--color-text);
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-/* Focus visible for accessibility */
 :focus-visible {
   outline: 2px solid var(--color-primary);
   outline-offset: 2px;
+}
+
+::selection {
+  background: var(--color-primary);
+  color: #fff;
+}
+
+/* Thin scrollbars, as on X */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border-strong) transparent;
+}
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+*::-webkit-scrollbar-thumb {
+  background: var(--color-border-strong);
+  border-radius: 999px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+@layer components {
+  /* Sticky, blurred column header */
+  .x-header {
+    @apply sticky top-0 z-20 px-4 flex items-center gap-6 min-h-[53px] border-b;
+    border-color: var(--color-border);
+    background: var(--color-scrim);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+  }
+
+  .x-title {
+    @apply text-[20px] font-bold leading-6 tracking-tight;
+  }
+
+  /* Equal-width tab strip with the rounded active underline */
+  .x-tabs {
+    @apply flex border-b;
+    border-color: var(--color-border);
+  }
+  .x-tab {
+    @apply flex-1 relative flex items-center justify-center min-h-[53px] px-4 text-[15px] font-medium transition-colors;
+    color: var(--color-text-secondary);
+  }
+  .x-tab:hover {
+    background: var(--color-row-hover);
+  }
+  .x-tab[aria-selected="true"] {
+    @apply font-bold;
+    color: var(--color-text);
+  }
+  .x-tab[aria-selected="true"]::after {
+    content: "";
+    @apply absolute bottom-0 h-1 rounded-full;
+    width: 56px;
+    background: var(--color-primary);
+  }
+
+  /* Monochrome primary action */
+  .btn {
+    @apply inline-flex items-center justify-center rounded-full font-bold transition-colors px-4 min-h-[36px] text-[15px];
+  }
+  .btn-primary {
+    background: var(--color-btn);
+    color: var(--color-btn-text);
+  }
+  .btn-primary:hover:not(:disabled) {
+    background: var(--color-btn-hover);
+  }
+  .btn-primary:disabled {
+    opacity: 0.5;
+  }
+  .btn-outline {
+    border: 1px solid var(--color-border-strong);
+    color: var(--color-text);
+  }
+  .btn-outline:hover:not(:disabled) {
+    background: var(--color-hover);
+  }
+  .btn-blue {
+    background: var(--color-primary);
+    color: #fff;
+  }
+  .btn-blue:hover:not(:disabled) {
+    background: var(--color-primary-hover);
+  }
+  .btn-lg {
+    @apply min-h-[52px] px-8 text-[17px];
+  }
+
+  /* Left rail item: icon + label, pill hover, bold when active */
+  .nav-item {
+    @apply inline-flex items-center gap-5 rounded-full px-3 py-2 text-[20px] transition-colors;
+  }
+  .nav-item:hover {
+    background: var(--color-hover);
+  }
+
+  .icon-btn {
+    @apply inline-flex items-center justify-center rounded-full transition-colors;
+    width: 36px;
+    height: 36px;
+  }
+  .icon-btn:hover {
+    background: var(--color-hover);
+  }
+
+  .card {
+    @apply rounded-2xl;
+    background: var(--color-bg-secondary);
+  }
+
+  .row-link {
+    @apply block px-4 py-3 transition-colors;
+  }
+  .row-link:hover {
+    background: var(--color-row-hover);
+  }
+
+  /* Search field */
+  .x-search {
+    @apply w-full rounded-full px-11 py-3 text-[15px] outline-none border transition-colors;
+    background: var(--color-bg-secondary);
+    border-color: transparent;
+    color: var(--color-text);
+  }
+  .x-search:focus {
+    background: var(--color-bg);
+    border-color: var(--color-primary);
+  }
+  .x-search::placeholder {
+    color: var(--color-text-secondary);
+  }
+
+  /* Form field with the floating-label treatment X uses */
+  .x-field {
+    @apply w-full rounded px-3 pt-6 pb-2 text-[17px] outline-none border bg-transparent transition-colors;
+    border-color: var(--color-border-strong);
+    color: var(--color-text);
+  }
+  .x-field:focus {
+    border-color: var(--color-primary);
+    border-width: 2px;
+  }
+
+  .x-label {
+    @apply absolute left-3 top-2 text-[13px] pointer-events-none;
+    color: var(--color-text-secondary);
+  }
+
+  .avatar {
+    @apply rounded-full object-cover shrink-0;
+    background: var(--color-bg-secondary);
+  }
+
+  .empty-state {
+    @apply px-8 py-10 mx-auto;
+    max-width: 400px;
+  }
+  .empty-state h2 {
+    @apply text-[31px] font-extrabold leading-9 mb-2 tracking-tight;
+  }
+  .empty-state p {
+    @apply text-[15px] leading-5;
+    color: var(--color-text-secondary);
+  }
+
+  .link {
+    color: var(--color-primary);
+  }
+  .link:hover {
+    text-decoration: underline;
+  }
 }
