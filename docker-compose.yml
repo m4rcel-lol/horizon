@@ -1,6 +1,14 @@
 services:
+  # OPTIONAL edge proxy. Not started by default — the app is published on
+  # HTTP_PORT (25343) for a TLS proxy that already runs on the host, e.g. the
+  # Caddy binary configured with infra/Caddyfile.host.
+  #
+  # Only if you want Docker to run the edge proxy too:
+  #   docker compose --profile edge up -d
   caddy:
     image: caddy:2-alpine
+    profiles:
+      - edge
     restart: unless-stopped
     ports:
       - "80:80"
@@ -11,7 +19,8 @@ services:
       - caddy_data:/data
       - caddy_config:/config
     environment:
-      - CADDY_DOMAIN=${CADDY_DOMAIN:-localhost}
+      - CADDY_DOMAIN=${CADDY_DOMAIN:-tweeting.shop}
+      - ACME_EMAIL=${ACME_EMAIL:-}
     depends_on:
       - api
       - web
@@ -35,7 +44,7 @@ services:
       minio:
         condition: service_started
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:3000/health/live"]
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/api/health/live"]
       interval: 15s
       timeout: 5s
       retries: 5
@@ -66,11 +75,21 @@ services:
     volumes:
       - ./assets:/app/assets:ro
 
+  # Serves the SPA and proxies /api, /ws and /media to the backing services, so
+  # the entire site is reachable on one port. Published on the loopback
+  # interface by default: the host's TLS proxy reaches it, the public internet
+  # does not. Set HTTP_BIND_ADDR=0.0.0.0 only if the proxy lives on another host.
   web:
     build:
       context: .
       dockerfile: apps/web/Dockerfile
     restart: unless-stopped
+    ports:
+      - "${HTTP_BIND_ADDR:-127.0.0.1}:${HTTP_PORT:-25343}:80"
+    environment:
+      - STORAGE_BUCKET=${STORAGE_BUCKET:-horizon}
+    depends_on:
+      - api
     networks:
       - horizon
 
@@ -114,9 +133,11 @@ services:
       MINIO_ROOT_PASSWORD: ${STORAGE_SECRET_KEY:-minioadmin}
     volumes:
       - minio_data:/data
+    # Loopback-only: media is served publicly through the web container's
+    # /media route, and the console should never be exposed to the internet.
     ports:
-      - "9000:9000"
-      - "9001:9001"
+      - "${MINIO_BIND_ADDR:-127.0.0.1}:9000:9000"
+      - "${MINIO_BIND_ADDR:-127.0.0.1}:9001:9001"
     networks:
       - horizon
 
