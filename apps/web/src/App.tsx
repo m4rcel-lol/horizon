@@ -11,6 +11,7 @@ import { AboutPage } from "./pages/AboutPage";
 import { SetupPage } from "./pages/SetupPage";
 import { LoginPage } from "./pages/LoginPage";
 import { RegisterPage } from "./pages/RegisterPage";
+import { AdminSettingsPage } from "./pages/AdminSettingsPage";
 
 export default function App() {
   return (
@@ -19,6 +20,7 @@ export default function App() {
       <Route path="/register" element={<RegisterPage />} />
       <Route path="/setup" element={<SetupPage />} />
       <Route path="/about" element={<AboutPage />} />
+      <Route path="/admin/settings" element={<AdminSettingsPage />} />
       <Route element={<MainLayout />}>
         <Route path="/" element={<HomePage />} />
         <Route path="/explore" element={<ExplorePage />} />

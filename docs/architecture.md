@@ -121,3 +121,17 @@ Single `docker compose`:
 - minio (or external S3)
 
 All volumes persistent. Healthchecks present.
+
+## Storage & Email configuration
+
+Object storage (S3-compatible) and SMTP are **optional in `.env`**.
+
+Resolution order (env wins when set):
+
+1. Environment variables (`STORAGE_*`, `SMTP_*`)
+2. Database `instance_settings` (Admin → Instance → Storage / Email)
+3. Code defaults
+
+`@horizon/config` exposes `resolveStorageConfig` and `resolveEmailConfig`.
+The admin API is under `/api/instance/settings` (GET/PATCH + test endpoints).
+Secrets are redacted in responses; empty secret fields on update leave previous values unchanged.
