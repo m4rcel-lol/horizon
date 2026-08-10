@@ -20,6 +20,19 @@ Optional (also configurable in admin):
 | `STORAGE_*` | S3-compatible object storage |
 | `SMTP_*` | Outbound email |
 
+Networking:
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `HTTP_PORT` | `25343` | Host port the whole site is published on, for the TLS reverse proxy in front |
+| `HTTP_BIND_ADDR` | `127.0.0.1` | Interface `HTTP_PORT` binds to |
+| `MINIO_BIND_ADDR` | `127.0.0.1` | Interface the MinIO API/console bind to |
+| `CADDY_DOMAIN` | `tweeting.shop` | Domain for the **optional** containerized proxy (`docker compose --profile edge up -d`) only |
+| `ACME_EMAIL` | — | Let's Encrypt contact address for the containerized proxy |
+
+A host-installed Caddy binary ignores `CADDY_DOMAIN`/`ACME_EMAIL` and takes its
+domain from `infra/Caddyfile.host`. See [Installation](installation.md#reverse-proxy).
+
 When both env and admin settings define storage or email, **environment wins**.
 
 ## Admin panel: Storage & Email

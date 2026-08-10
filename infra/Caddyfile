@@ -1,44 +1,39 @@
-{
-  # Global options
-  email {$ACME_EMAIL:}
-}
+# Caddyfile for the OPTIONAL containerized edge proxy.
+#
+# Only used when you start the `caddy` service explicitly:
+#   docker compose --profile edge up -d
+#
+# If you already run Caddy as a binary on the host, ignore this file and use
+# infra/Caddyfile.host instead — running both would fight over ports 80/443.
+#
+# Routing (SPA, /api, /media) lives in apps/web/Caddyfile.static so that both
+# proxy options behave identically; this file only terminates TLS.
 
-{$CADDY_DOMAIN:localhost} {
-  # API
-  handle /api/* {
-    reverse_proxy api:3000
-  }
+# Optional: to receive Let's Encrypt expiry notices, set ACME_EMAIL in .env and
+# uncomment the block below. It must stay commented out while ACME_EMAIL is
+# empty — Caddy refuses to start on an `email` directive with no value.
+# {
+# 	email {$ACME_EMAIL}
+# }
 
-  handle /health* {
-    reverse_proxy api:3000
-  }
+{$CADDY_DOMAIN:tweeting.shop} {
+	encode gzip zstd
 
-  handle /ws* {
-    reverse_proxy api:3000
-  }
+	reverse_proxy web:80 {
+		header_up X-Forwarded-Host {host}
+	}
 
-  # Setup and about are served by API or web
-  handle /setup* {
-    reverse_proxy api:3000
-  }
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options nosniff
+		X-Frame-Options DENY
+		Referrer-Policy strict-origin-when-cross-origin
+		Permissions-Policy "camera=(), microphone=(), geolocation=()"
+		-Server
+	}
 
-  # Everything else → frontend
-  handle {
-    reverse_proxy web:80
-  }
-
-  encode gzip zstd
-  header {
-    # Security headers
-    X-Content-Type-Options nosniff
-    X-Frame-Options DENY
-    Referrer-Policy strict-origin-when-cross-origin
-    Permissions-Policy "camera=(), microphone=(), geolocation=()"
-    -Server
-  }
-
-  log {
-    output stdout
-    format console
-  }
+	log {
+		output stdout
+		format console
+	}
 }

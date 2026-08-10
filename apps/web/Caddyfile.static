@@ -1,6 +1,54 @@
+# Application entrypoint.
+#
+# This container serves the built SPA *and* routes API traffic, so the whole
+# site is reachable through a single port. That port is published on the host
+# (HTTP_PORT, default 25343) and terminated by a TLS reverse proxy in front of
+# it — either the Caddy binary running on the host, or the optional `caddy`
+# service in docker-compose.yml (`--profile edge`).
+#
+# No TLS is configured here on purpose: the proxy in front handles it.
+
 :80 {
-  root * /usr/share/caddy
-  try_files {path} /index.html
-  file_server
-  encode gzip
+	encode gzip zstd
+
+	# API, including any future WebSocket endpoints. Caddy proxies WebSocket
+	# upgrades transparently.
+	handle /api/* {
+		reverse_proxy {$API_UPSTREAM:api:3000}
+	}
+
+	handle /ws* {
+		reverse_proxy {$API_UPSTREAM:api:3000}
+	}
+
+	# Object storage passthrough, so uploaded media is served from the site's
+	# own origin instead of exposing MinIO publicly. Set
+	# STORAGE_PUBLIC_URL=https://<your-domain>/media to use it. Deployments on
+	# external S3/CDN storage simply never hit this route.
+	handle_path /media/* {
+		rewrite * /{$STORAGE_BUCKET:horizon}{uri}
+		reverse_proxy {$MEDIA_UPSTREAM:minio:9000} {
+			header_up Host {upstream_hostport}
+		}
+	}
+
+	# Everything else is the SPA.
+	handle {
+		root * /usr/share/caddy
+		try_files {path} /index.html
+		file_server
+	}
+
+	header {
+		X-Content-Type-Options nosniff
+		X-Frame-Options DENY
+		Referrer-Policy strict-origin-when-cross-origin
+		Permissions-Policy "camera=(), microphone=(), geolocation=()"
+		-Server
+	}
+
+	log {
+		output stdout
+		format console
+	}
 }

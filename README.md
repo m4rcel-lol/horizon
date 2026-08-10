@@ -32,6 +32,22 @@ cp .env.example .env
 docker compose up -d
 ```
 
+Compose publishes the whole site (SPA, API, media) on `127.0.0.1:25343` and does
+not bind ports 80/443, so you can put your own TLS reverse proxy in front of it.
+For the reference deployment at `tweeting.shop`, that's Caddy running on the
+host:
+
+```bash
+sudo cp infra/Caddyfile.host /etc/caddy/Caddyfile
+sudo systemctl reload caddy
+```
+
+Prefer Docker to run the proxy as well? It's opt-in:
+
+```bash
+docker compose --profile edge up -d   # adds caddy:2-alpine on ports 80/443
+```
+
 Then open your instance URL and complete the first-run setup at `/setup`.
 
 ## Documentation
