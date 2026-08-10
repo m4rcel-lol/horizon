@@ -4,10 +4,26 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/assets/logo.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#1d9bf0" />
+    <meta name="theme-color" content="#000000" />
     <title>Horizon</title>
+    <script>
+      // Set the theme before first paint so the page never flashes the wrong
+      // background. Mirrors resolveTheme() in src/theme.ts.
+      (function () {
+        try {
+          var saved = localStorage.getItem("horizon:theme");
+          var dark =
+            saved === "dark" ||
+            (saved !== "light" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+          document.documentElement.classList.toggle("dark", dark);
+          document
+            .querySelector('meta[name="theme-color"]')
+            .setAttribute("content", dark ? "#000000" : "#ffffff");
+        } catch (e) {}
+      })();
+    </script>
   </head>
-  <body class="bg-white dark:bg-black text-gray-900 dark:text-gray-100">
+  <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

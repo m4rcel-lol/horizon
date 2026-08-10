@@ -1,4 +1,4 @@
-import { Outlet, NavLink } from "react-router-dom";
+import { Outlet, NavLink, Link } from "react-router-dom";
 import {
   HomeIcon,
   ExploreIcon,
@@ -9,7 +9,12 @@ import {
   CommunitiesIcon,
   ProfileIcon,
   MoreIcon,
+  SearchIcon,
+  ComposeIcon,
+  SunIcon,
+  MoonIcon,
 } from "../icons";
+import { useTheme } from "../theme";
 
 const navItems = [
   { to: "/", label: "Home", icon: HomeIcon, end: true },
@@ -23,97 +28,154 @@ const navItems = [
 ];
 
 export function MainLayout() {
-  return (
-    <div className="min-h-screen flex justify-center bg-[var(--color-bg)]">
-      <div className="w-full max-w-[1280px] flex">
-        {/* Left navigation - desktop */}
-        <nav
-          className="hidden md:flex flex-col w-[275px] shrink-0 px-3 py-2 sticky top-0 h-screen border-r border-[var(--color-border)]"
-          aria-label="Main"
-        >
-          <div className="mb-4 px-3">
-            <NavLink to="/" className="inline-flex p-2 rounded-full hover:bg-[var(--color-bg-secondary)]">
-              <img src="/assets/logo.svg" alt="Horizon" className="w-8 h-8" />
-            </NavLink>
-          </div>
+  const { theme, toggle } = useTheme();
 
-          <ul className="flex flex-col gap-1">
-            {navItems.map(({ to, label, icon: Icon, end }) => (
-              <li key={to}>
-                <NavLink
-                  to={to}
-                  end={end}
-                  className={({ isActive }) =>
-                    `flex items-center gap-5 px-3 py-3 rounded-full text-xl transition-colors hover:bg-[var(--color-bg-secondary)] ${
-                      isActive ? "font-bold" : "font-normal"
-                    }`
-                  }
-                >
-                  <Icon className="w-7 h-7" />
-                  <span className="hidden xl:inline">{label}</span>
-                </NavLink>
+  return (
+    <div className="min-h-screen flex justify-center">
+      <div className="w-full max-w-[1290px] flex">
+        {/* Left rail — icons only from md, icons + labels from xl */}
+        <div className="hidden md:flex flex-col items-end xl:items-stretch w-[88px] xl:w-[275px] shrink-0 px-1 xl:px-3 sticky top-0 h-screen">
+          <nav className="flex flex-col h-full py-1" aria-label="Main">
+            <Link
+              to="/"
+              className="icon-btn !w-[50px] !h-[50px] my-0.5 self-start xl:ml-1"
+              aria-label="Horizon home"
+            >
+              <img src="/assets/logo.svg" alt="" className="w-8 h-8" />
+            </Link>
+
+            <ul className="flex flex-col gap-0.5 mt-1">
+              {navItems.map(({ to, label, icon: Icon, end }) => (
+                <li key={to}>
+                  <NavLink
+                    to={to}
+                    end={end}
+                    className={({ isActive }) => `nav-item ${isActive ? "font-bold" : "font-normal"}`}
+                  >
+                    <Icon className="w-[26.25px] h-[26.25px] shrink-0" />
+                    <span className="hidden xl:inline pr-4">{label}</span>
+                  </NavLink>
+                </li>
+              ))}
+              <li>
+                <button type="button" className="nav-item w-full">
+                  <MoreIcon className="w-[26.25px] h-[26.25px] shrink-0" />
+                  <span className="hidden xl:inline pr-4">More</span>
+                </button>
               </li>
-            ))}
-            <li>
+            </ul>
+
+            <button
+              type="button"
+              className="btn btn-primary mt-4 w-[50px] h-[50px] xl:w-full xl:min-h-[52px] p-0 xl:px-8 text-[17px] self-center xl:self-auto"
+              aria-label="Post"
+            >
+              <span className="hidden xl:inline">Post</span>
+              <ComposeIcon className="w-6 h-6 xl:hidden" />
+            </button>
+
+            <div className="mt-auto mb-3 flex xl:justify-start justify-center">
               <button
                 type="button"
-                className="flex items-center gap-5 px-3 py-3 rounded-full text-xl w-full hover:bg-[var(--color-bg-secondary)]"
+                onClick={toggle}
+                className="nav-item"
+                aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
               >
-                <MoreIcon className="w-7 h-7" />
-                <span className="hidden xl:inline">More</span>
+                {theme === "dark" ? (
+                  <SunIcon className="w-[26.25px] h-[26.25px] shrink-0" />
+                ) : (
+                  <MoonIcon className="w-[26.25px] h-[26.25px] shrink-0" />
+                )}
+                <span className="hidden xl:inline pr-4 text-[15px]">
+                  {theme === "dark" ? "Light mode" : "Dark mode"}
+                </span>
               </button>
-            </li>
-          </ul>
+            </div>
+          </nav>
+        </div>
 
-          <button
-            type="button"
-            className="mt-4 mx-3 bg-[var(--color-primary)] hover:bg-[var(--color-primary-hover)] text-white font-bold py-3 px-6 rounded-full transition-colors"
-          >
-            Post
-          </button>
-        </nav>
-
-        {/* Main content */}
-        <main className="flex-1 min-w-0 border-x border-[var(--color-border)] max-w-[600px]">
+        {/* Timeline column */}
+        <main
+          className="flex-1 min-w-0 w-full max-w-[600px] border-x pb-16 md:pb-0"
+          style={{ borderColor: "var(--color-border)" }}
+        >
           <Outlet />
         </main>
 
-        {/* Right sidebar - desktop */}
-        <aside className="hidden lg:block w-[350px] shrink-0 px-6 py-2 sticky top-0 h-screen overflow-y-auto">
-          <div className="bg-[var(--color-bg-secondary)] rounded-2xl p-4 mb-4">
-            <h2 className="font-bold text-xl mb-3">Trends</h2>
-            <p className="text-[var(--color-text-secondary)] text-sm">
-              Trends will appear here once the instance has activity.
-            </p>
+        {/* Right sidebar */}
+        <aside className="hidden lg:block w-[350px] shrink-0 px-8 py-1 sticky top-0 h-screen overflow-y-auto">
+          <div className="sticky top-0 py-2 z-10" style={{ background: "var(--color-bg)" }}>
+            <div className="relative">
+              <SearchIcon
+                className="w-[18px] h-[18px] absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none"
+                style={{ color: "var(--color-text-secondary)" }}
+              />
+              <input type="search" placeholder="Search" className="x-search" aria-label="Search Horizon" />
+            </div>
           </div>
-          <div className="bg-[var(--color-bg-secondary)] rounded-2xl p-4">
-            <h2 className="font-bold text-xl mb-3">Who to follow</h2>
-            <p className="text-[var(--color-text-secondary)] text-sm">
-              Suggestions based on your network will appear here.
+
+          <section className="card mt-3 overflow-hidden" aria-labelledby="trends-heading">
+            <h2 id="trends-heading" className="text-[20px] font-extrabold px-4 pt-3 pb-2">
+              Trends
+            </h2>
+            <p className="px-4 pb-4 text-[15px]" style={{ color: "var(--color-text-secondary)" }}>
+              Trends appear once the instance has activity. Ranking is statistical and configurable by
+              administrators — never algorithmic profiling.
             </p>
-          </div>
+          </section>
+
+          <section className="card mt-4 overflow-hidden" aria-labelledby="follow-heading">
+            <h2 id="follow-heading" className="text-[20px] font-extrabold px-4 pt-3 pb-2">
+              Who to follow
+            </h2>
+            <p className="px-4 pb-4 text-[15px]" style={{ color: "var(--color-text-secondary)" }}>
+              Suggestions from your own network appear here.
+            </p>
+          </section>
+
+          <nav
+            className="flex flex-wrap gap-x-3 gap-y-1 px-4 py-4 text-[13px]"
+            style={{ color: "var(--color-text-secondary)" }}
+            aria-label="Footer"
+          >
+            <Link to="/about" className="hover:underline">
+              About
+            </Link>
+            <a href="https://github.com/m4rcel-lol/horizon" className="hover:underline">
+              Source
+            </a>
+            <span>AGPL-3.0</span>
+          </nav>
         </aside>
       </div>
 
-      {/* Mobile bottom nav */}
+      {/* Mobile bottom bar */}
       <nav
-        className="md:hidden fixed bottom-0 left-0 right-0 flex justify-around items-center h-14 border-t border-[var(--color-border)] bg-[var(--color-bg)] z-50"
-        aria-label="Mobile"
+        className="md:hidden fixed bottom-0 inset-x-0 flex justify-around items-center h-[53px] border-t z-50"
+        style={{ borderColor: "var(--color-border)", background: "var(--color-bg)" }}
+        aria-label="Primary"
       >
         {navItems.slice(0, 5).map(({ to, label, icon: Icon, end }) => (
           <NavLink
             key={to}
             to={to}
             end={end}
-            className={({ isActive }) =>
-              `p-3 ${isActive ? "text-[var(--color-primary)]" : ""}`
-            }
+            className={({ isActive }) => `p-3 ${isActive ? "" : "opacity-60"}`}
             aria-label={label}
           >
-            <Icon className="w-6 h-6" />
+            <Icon className="w-[26px] h-[26px]" />
           </NavLink>
         ))}
       </nav>
+
+      {/* Mobile compose button */}
+      <button
+        type="button"
+        className="md:hidden fixed right-4 bottom-[69px] w-14 h-14 rounded-full btn btn-primary shadow-lg z-50"
+        aria-label="Post"
+      >
+        <ComposeIcon className="w-6 h-6" />
+      </button>
     </div>
   );
 }

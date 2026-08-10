@@ -634,7 +634,7 @@ model ListMember {
   addedAt   DateTime @default(now())
 
   list List @relation(fields: [listId], references: [id], onDelete: Cascade)
-  // user relation can be added
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@id([listId, userId])
 }

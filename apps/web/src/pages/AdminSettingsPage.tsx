@@ -130,66 +130,63 @@ export function AdminSettingsPage() {
   }
 
   return (
-    <div className="max-w-2xl mx-auto p-6">
-      <h1 className="text-2xl font-bold mb-2">Instance settings</h1>
-      <p className="text-sm text-[var(--color-text-secondary)] mb-6">
-        Object storage and SMTP can be set here or via environment variables. Env overrides admin when both are set.
-      </p>
+    <div className="max-w-[600px] mx-auto min-h-screen border-x" style={{ borderColor: "var(--color-border)" }}>
+      <header className="x-header justify-between">
+        <h1 className="x-title">Instance settings</h1>
+        <div className="flex gap-2">
+          <button type="button" onClick={load} disabled={loading} className="btn btn-outline">
+            Load
+          </button>
+          <button type="button" onClick={save} disabled={loading} className="btn btn-primary">
+            Save
+          </button>
+        </div>
+      </header>
 
-      <div className="flex gap-2 mb-6">
-        <button
-          type="button"
-          onClick={load}
-          disabled={loading}
-          className="px-4 py-2 rounded-full border border-[var(--color-border)] hover:bg-[var(--color-bg-secondary)]"
-        >
-          Load
-        </button>
-        <button
-          type="button"
-          onClick={save}
-          disabled={loading}
-          className="px-4 py-2 rounded-full bg-[var(--color-primary)] text-white font-bold"
-        >
-          Save
-        </button>
+      <div className="px-4 py-4">
+        <p className="text-[15px]" style={{ color: "var(--color-text-secondary)" }}>
+          Object storage and SMTP can be set here or via environment variables. Environment values win when both are
+          set.
+        </p>
       </div>
 
       {message && (
-        <p className="mb-4 text-sm p-3 rounded-lg bg-[var(--color-bg-secondary)]" role="status">
+        <p className="mx-4 mb-4 text-[14px] p-3 rounded-2xl card" role="status">
           {message}
         </p>
       )}
 
-      <section className="mb-10">
-        <h2 className="text-xl font-bold mb-4">Storage (S3-compatible)</h2>
-        <div className="space-y-3">
+      <section className="px-4 pb-8">
+        <h2 className="text-[20px] font-extrabold mb-4">Storage (S3-compatible)</h2>
+        <div className="flex flex-col gap-4">
           <Field label="Endpoint URL" value={storage.endpoint} onChange={(v) => setStorage({ ...storage, endpoint: v })} />
           <Field label="Region" value={storage.region} onChange={(v) => setStorage({ ...storage, region: v })} />
           <Field label="Bucket" value={storage.bucket} onChange={(v) => setStorage({ ...storage, bucket: v })} />
           <Field label="Access key" value={storage.accessKey} onChange={(v) => setStorage({ ...storage, accessKey: v })} placeholder="Leave blank to keep current" />
           <Field label="Secret key" type="password" value={storage.secretKey} onChange={(v) => setStorage({ ...storage, secretKey: v })} placeholder="Leave blank to keep current" />
           <Field label="Public base URL" value={storage.publicUrl} onChange={(v) => setStorage({ ...storage, publicUrl: v })} />
-          <label className="flex items-center gap-2 text-sm">
+          <label className="flex items-center gap-3 text-[15px]">
             <input
               type="checkbox"
+              className="w-4 h-4"
               checked={storage.forcePathStyle}
               onChange={(e) => setStorage({ ...storage, forcePathStyle: e.target.checked })}
             />
             Force path-style (MinIO / some S3-compatible providers)
           </label>
-          <button type="button" onClick={testStorage} className="text-sm text-[var(--color-primary)] hover:underline">
+          <button type="button" onClick={testStorage} className="link text-[15px] self-start">
             Test storage configuration
           </button>
         </div>
       </section>
 
-      <section>
-        <h2 className="text-xl font-bold mb-4">Email (SMTP)</h2>
-        <div className="space-y-3">
-          <label className="flex items-center gap-2 text-sm">
+      <section className="px-4 pb-10 border-t pt-8" style={{ borderColor: "var(--color-border)" }}>
+        <h2 className="text-[20px] font-extrabold mb-4">Email (SMTP)</h2>
+        <div className="flex flex-col gap-4">
+          <label className="flex items-center gap-3 text-[15px]">
             <input
               type="checkbox"
+              className="w-4 h-4"
               checked={email.enabled}
               onChange={(e) => setEmail({ ...email, enabled: e.target.checked })}
             />
@@ -197,9 +194,10 @@ export function AdminSettingsPage() {
           </label>
           <Field label="SMTP host" value={email.host} onChange={(v) => setEmail({ ...email, host: v })} />
           <Field label="Port" value={String(email.port)} onChange={(v) => setEmail({ ...email, port: Number(v) || 587 })} />
-          <label className="flex items-center gap-2 text-sm">
+          <label className="flex items-center gap-3 text-[15px]">
             <input
               type="checkbox"
+              className="w-4 h-4"
               checked={email.secure}
               onChange={(e) => setEmail({ ...email, secure: e.target.checked })}
             />
@@ -208,7 +206,7 @@ export function AdminSettingsPage() {
           <Field label="Username" value={email.user} onChange={(v) => setEmail({ ...email, user: v })} />
           <Field label="Password" type="password" value={email.password} onChange={(v) => setEmail({ ...email, password: v })} placeholder="Leave blank to keep current" />
           <Field label="From address" value={email.from} onChange={(v) => setEmail({ ...email, from: v })} placeholder='Horizon <noreply@example.com>' />
-          <button type="button" onClick={testEmail} className="text-sm text-[var(--color-primary)] hover:underline">
+          <button type="button" onClick={testEmail} className="link text-[15px] self-start">
             Send test email
           </button>
         </div>
@@ -230,15 +228,20 @@ function Field({
   type?: string;
   placeholder?: string;
 }) {
+  // Derive a stable id so the label actually points at its input.
+  const id = `field-${label.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
   return (
-    <div>
-      <label className="block text-sm font-medium mb-1">{label}</label>
+    <div className="relative">
+      <label htmlFor={id} className="x-label">
+        {label}
+      </label>
       <input
+        id={id}
         type={type}
         value={value}
         placeholder={placeholder}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full rounded-md border border-[var(--color-border)] bg-transparent px-3 py-2 outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+        className="x-field"
       />
     </div>
   );
