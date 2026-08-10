@@ -10,6 +10,7 @@ Horizon is a production-grade, independently implemented social platform that ca
 - Profiles, posts, replies, reposts, quote posts
 - Likes, bookmarks (with folders), lists, communities
 - Notifications, direct messages, search, trends, hashtags, mentions
+- Community Notes: reader-written context, rated by readers
 - Polls, media (images/video), long-form posts, scheduled posts, drafts
 - Content warnings, visibility controls, edit history
 - Blocking, muting, reporting, full rule-based moderation
@@ -57,6 +58,7 @@ See the `docs/` directory:
 - [Installation](docs/installation.md)
 - [Configuration](docs/configuration.md)
 - [Verification & affiliation](docs/verification.md)
+- [Community Notes](docs/community-notes.md)
 - [Architecture](docs/architecture.md)
 - [Database](docs/database.md)
 - [Development](docs/development.md)

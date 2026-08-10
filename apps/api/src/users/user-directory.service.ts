@@ -1,5 +1,6 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable, OnModuleInit } from "@nestjs/common";
 import {
+  COMMUNITY_NOTES_ACCOUNT,
   type VerificationType,
   avatarShapeFor,
   canAffiliate,
@@ -7,6 +8,8 @@ import {
   effectiveVerification,
   verificationPresentation,
 } from "@horizon/shared";
+
+export type AccountStatus = "ACTIVE" | "SUSPENDED";
 
 export interface DirectoryUser {
   id: string;
@@ -17,6 +20,10 @@ export interface DirectoryUser {
   verification: VerificationType;
   affiliatedToId: string | null;
   affiliatedAt: string | null;
+  status: AccountStatus;
+  /** Seeded by the instance: immutable and impossible to sign into. */
+  isSystem: boolean;
+  loginDisabled: boolean;
   createdAt: string;
 }
 
@@ -48,6 +55,9 @@ export interface PresentedUser extends Omit<DirectoryUser, "affiliatedToId"> {
   canAffiliate: boolean;
   affiliatedTo: AffiliationSummary | null;
   affiliateCount: number;
+  status: AccountStatus;
+  isSystem: boolean;
+  loginDisabled: boolean;
 }
 
 export class DirectoryError extends Error {
@@ -69,10 +79,47 @@ export class DirectoryError extends Error {
  * persistence layer is unfinished. Nothing here survives a restart.
  */
 @Injectable()
-export class UserDirectoryService {
+export class UserDirectoryService implements OnModuleInit {
   private users = new Map<string, DirectoryUser>();
   private history: VerificationEvent[] = [];
   private seq = 0;
+
+  onModuleInit() {
+    this.seedSystemAccounts();
+  }
+
+  /**
+   * @CommunityNotes is owned by the instance, not by a person: verified as a
+   * business so its notes carry the badge, and immutable so no administrator
+   * can quietly repurpose or silence it.
+   */
+  private seedSystemAccounts() {
+    if (this.byUsername(COMMUNITY_NOTES_ACCOUNT.username)) return;
+    const user: DirectoryUser = {
+      id: "usr_system_communitynotes",
+      username: COMMUNITY_NOTES_ACCOUNT.username,
+      displayName: COMMUNITY_NOTES_ACCOUNT.displayName,
+      bio: COMMUNITY_NOTES_ACCOUNT.bio,
+      verification: "BUSINESS",
+      affiliatedToId: null,
+      affiliatedAt: null,
+      status: "ACTIVE",
+      isSystem: true,
+      loginDisabled: true,
+      createdAt: new Date().toISOString(),
+    };
+    this.users.set(user.id, user);
+  }
+
+  /** System accounts reject every mutation, whoever is asking. */
+  private refuseIfSystem(user: DirectoryUser, action: string) {
+    if (!user.isSystem) return;
+    throw new DirectoryError(
+      "SYSTEM_ACCOUNT_IMMUTABLE",
+      `@${user.username} is a system account and cannot be ${action}.`,
+      403,
+    );
+  }
 
   private nextId(prefix: string) {
     this.seq += 1;
@@ -112,7 +159,7 @@ export class UserDirectoryService {
       username: user.username,
       displayName: user.displayName,
       verification: type,
-      avatarShape: avatarShapeFor(user.verification),
+      avatarShape: avatarShapeFor(type),
       badge: presentation.badge,
     };
   }
@@ -131,14 +178,19 @@ export class UserDirectoryService {
       verification: user.verification,
       effectiveVerification: type,
       badge: presentation.badge,
-      // Shape reflects what the account is, so an affiliated person keeps a
-      // circular avatar even though their badge was raised to business.
-      avatarShape: avatarShapeFor(user.verification),
+      // Shape follows the displayed badge: an account raised to business by an
+      // affiliation shows square until that affiliation is removed.
+      avatarShape: avatarShapeFor(type),
       verificationLabel: presentation.label,
-      canAffiliate: canAffiliate(type),
+      // System accounts hold an organisation tier but refuse every mutation,
+      // so they never offer affiliation either.
+      canAffiliate: canAffiliate(type) && !user.isSystem,
       affiliatedTo: parent ? this.summarise(parent) : null,
       affiliatedAt: user.affiliatedAt,
       createdAt: user.createdAt,
+      status: user.status,
+      isSystem: user.isSystem,
+      loginDisabled: user.loginDisabled,
       affiliateCount: [...this.users.values()].filter((u) => u.affiliatedToId === user.id).length,
     };
   }
@@ -165,6 +217,9 @@ export class UserDirectoryService {
       verification: input.verification ?? "NONE",
       affiliatedToId: null,
       affiliatedAt: null,
+      status: "ACTIVE",
+      isSystem: false,
+      loginDisabled: false,
       createdAt: new Date().toISOString(),
     };
     this.users.set(user.id, user);
@@ -177,6 +232,7 @@ export class UserDirectoryService {
   /** Grant or revoke a tier directly (the verification.grant / .revoke permissions). */
   setVerification(username: string, type: VerificationType, reason?: string) {
     const user = this.require(username);
+    this.refuseIfSystem(user, "re-verified");
     const from = user.verification;
     user.verification = type;
 
@@ -205,6 +261,8 @@ export class UserDirectoryService {
   affiliate(organisationUsername: string, targetUsername: string) {
     const organisation = this.require(organisationUsername);
     const target = this.require(targetUsername);
+    this.refuseIfSystem(organisation, "used to affiliate accounts");
+    this.refuseIfSystem(target, "affiliated");
 
     const organisationType = effectiveVerification(
       organisation.verification,
@@ -236,6 +294,7 @@ export class UserDirectoryService {
 
   removeAffiliation(targetUsername: string) {
     const target = this.require(targetUsername);
+    this.refuseIfSystem(target, "un-affiliated");
     if (!target.affiliatedToId) {
       throw new DirectoryError("NOT_AFFILIATED", `@${target.username} is not affiliated.`, 409);
     }
@@ -266,10 +325,28 @@ export class UserDirectoryService {
 
   /** Wipe the directory — used by tests and by operators clearing demo data. */
   reset() {
-    const removed = this.users.size;
+    const removed = [...this.users.values()].filter((u) => !u.isSystem).length;
     this.users.clear();
     this.history = [];
+    this.seedSystemAccounts();
     return { removed };
+  }
+
+  /** Edit an ordinary profile. System accounts refuse. */
+  update(username: string, changes: { displayName?: string; bio?: string }) {
+    const user = this.require(username);
+    this.refuseIfSystem(user, "edited");
+    if (changes.displayName !== undefined) user.displayName = changes.displayName;
+    if (changes.bio !== undefined) user.bio = changes.bio;
+    return this.present(user);
+  }
+
+  /** Suspend or restore an account. System accounts refuse. */
+  setStatus(username: string, status: AccountStatus) {
+    const user = this.require(username);
+    this.refuseIfSystem(user, status === "SUSPENDED" ? "suspended" : "restored");
+    user.status = status;
+    return this.present(user);
   }
 
   private record(

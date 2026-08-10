@@ -8,6 +8,8 @@ import { BookmarksPage } from "./pages/BookmarksPage";
 import { ListsPage } from "./pages/ListsPage";
 import { CommunitiesPage } from "./pages/CommunitiesPage";
 import { ProfilePage } from "./pages/ProfilePage";
+import { AffiliatesPage } from "./pages/AffiliatesPage";
+import { CommunityNotesPage } from "./pages/CommunityNotesPage";
 import { PostPage } from "./pages/PostPage";
 import { AboutPage } from "./pages/AboutPage";
 import { SetupPage } from "./pages/SetupPage";
@@ -31,11 +33,13 @@ export default function App() {
         <Route path="/notifications" element={<NotificationsPage />} />
         <Route path="/messages" element={<MessagesPage />} />
         <Route path="/bookmarks" element={<BookmarksPage />} />
+        <Route path="/notes" element={<CommunityNotesPage />} />
         {/* These were linked from the nav but had no route, so they fell
             through to /:username and rendered as profiles. */}
         <Route path="/lists" element={<ListsPage />} />
         <Route path="/communities" element={<CommunitiesPage />} />
         <Route path="/profile" element={<ProfilePage />} />
+        <Route path="/:username/affiliates" element={<AffiliatesPage />} />
         <Route path="/:username" element={<ProfilePage />} />
         <Route path="/:username/status/:postId" element={<PostPage />} />
       </Route>

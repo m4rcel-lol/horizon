@@ -7,6 +7,7 @@ import { UsersModule } from "./users/users.module";
 import { PostsModule } from "./posts/posts.module";
 import { InstanceModule } from "./instance/instance.module";
 import { SetupModule } from "./setup/setup.module";
+import { CommunityNotesModule } from "./notes/community-notes.module";
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { SetupModule } from "./setup/setup.module";
     PostsModule,
     InstanceModule,
     SetupModule,
+    CommunityNotesModule,
   ],
   providers: [
     {
