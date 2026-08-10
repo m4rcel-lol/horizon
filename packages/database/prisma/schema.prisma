@@ -50,6 +50,10 @@ model User {
   affiliatedToId    String?
   affiliatedAt      DateTime?
   status            AccountStatus  @default(ACTIVE)
+  // System accounts (e.g. @CommunityNotes) are seeded by the instance. They
+  // cannot be signed into, edited, suspended or affiliated.
+  isSystem          Boolean        @default(false)
+  loginDisabled     Boolean        @default(false)
   isProtected       Boolean        @default(false) // protected account
   locale            String         @default("en")
   timezone          String         @default("UTC")
@@ -88,6 +92,8 @@ model User {
   verificationHistory VerificationHistory[]
   affiliatedTo      User?          @relation("Affiliation", fields: [affiliatedToId], references: [id], onDelete: SetNull)
   affiliates        User[]         @relation("Affiliation")
+  communityNotes    CommunityNote[]       @relation("CommunityNoteAuthor")
+  communityNoteRatings CommunityNoteRating[] @relation("CommunityNoteRater")
   drafts            Draft[]
   scheduledPosts    ScheduledPost[]
   pollsVoted        PollVote[]
@@ -223,6 +229,7 @@ model Post {
   repostOfId      String?
   threadPosition  Int?           // 1/5 etc
   threadSize      Int?
+  communityNotes  CommunityNote[]
   likeCount       Int            @default(0)
   replyCount      Int            @default(0)
   repostCount     Int            @default(0)
@@ -891,6 +898,60 @@ model VerificationHistory {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, createdAt(sort: Desc)])
+}
+
+
+// ============================================================================
+// Community Notes
+// ============================================================================
+
+enum CommunityNoteStatus {
+  NEEDS_MORE_RATINGS
+  HELPFUL
+  NOT_HELPFUL
+}
+
+enum CommunityNoteClassification {
+  MISLEADING
+  MISSING_CONTEXT
+  DISPUTED
+  OUTDATED
+  SATIRE
+}
+
+model CommunityNote {
+  id              String                      @id @default(cuid())
+  postId          String
+  authorId        String?
+  classification  CommunityNoteClassification @default(MISSING_CONTEXT)
+  body            String                      @db.VarChar(600)
+  sourceUrl       String?
+  // Derived from ratings; stored so the timeline can filter without recounting.
+  status          CommunityNoteStatus         @default(NEEDS_MORE_RATINGS)
+  helpfulCount    Int                         @default(0)
+  notHelpfulCount Int                         @default(0)
+  createdAt       DateTime                    @default(now())
+  updatedAt       DateTime                    @updatedAt
+
+  post    Post                  @relation(fields: [postId], references: [id], onDelete: Cascade)
+  author  User?                 @relation("CommunityNoteAuthor", fields: [authorId], references: [id], onDelete: SetNull)
+  ratings CommunityNoteRating[]
+
+  @@index([postId, status])
+  @@index([status, createdAt(sort: Desc)])
+}
+
+model CommunityNoteRating {
+  noteId    String
+  userId    String
+  helpful   Boolean
+  createdAt DateTime @default(now())
+
+  note CommunityNote @relation(fields: [noteId], references: [id], onDelete: Cascade)
+  user User          @relation("CommunityNoteRater", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([noteId, userId])
+  @@index([userId])
 }
 
 // ============================================================================

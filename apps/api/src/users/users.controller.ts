@@ -39,6 +39,23 @@ class AffiliateDto {
   username!: string;
 }
 
+class UpdateUserDto {
+  @IsOptional()
+  @IsString()
+  @Length(1, 50)
+  displayName?: string;
+
+  @IsOptional()
+  @IsString()
+  @Length(0, 500)
+  bio?: string;
+}
+
+class SetStatusDto {
+  @IsIn(["ACTIVE", "SUSPENDED"])
+  status!: "ACTIVE" | "SUSPENDED";
+}
+
 /**
  * Accounts, verification tiers and affiliations.
  *
@@ -75,6 +92,17 @@ export class UsersController {
   @Get(":username")
   get(@Param("username") username: string) {
     return this.unwrap(() => ({ user: this.directory.get(username) }));
+  }
+
+  @Patch(":username")
+  update(@Param("username") username: string, @Body() body: UpdateUserDto) {
+    return this.unwrap(() => ({ user: this.directory.update(username, body) }));
+  }
+
+  /** Suspend or restore. System accounts refuse. */
+  @Patch(":username/status")
+  setStatus(@Param("username") username: string, @Body() body: SetStatusDto) {
+    return this.unwrap(() => ({ user: this.directory.setStatus(username, body.status) }));
   }
 
   @Patch(":username/verification")

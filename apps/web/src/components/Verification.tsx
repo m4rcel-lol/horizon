@@ -83,17 +83,29 @@ export function NameWithBadges({
   affiliatedTo,
   className = "",
   badgeClassName,
+  badgeHref,
+  badgeTitle,
 }: {
   displayName: string;
   verification: VerificationType;
   affiliatedTo?: { username: string; displayName: string } | null;
   className?: string;
   badgeClassName?: string;
+  /** Makes the badge a link — used on organisations to open their affiliates. */
+  badgeHref?: string;
+  badgeTitle?: string;
 }) {
+  const badge = <VerifiedBadge type={verification} className={badgeClassName} />;
   return (
     <span className={`inline-flex items-center gap-1 min-w-0 ${className}`}>
       <span className="truncate">{displayName}</span>
-      <VerifiedBadge type={verification} className={badgeClassName} />
+      {badgeHref ? (
+        <Link to={badgeHref} title={badgeTitle} className="inline-flex shrink-0">
+          {badge}
+        </Link>
+      ) : (
+        badge
+      )}
       {affiliatedTo ? <AffiliateBadge organisation={affiliatedTo} /> : null}
     </span>
   );

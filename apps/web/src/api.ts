@@ -1,4 +1,8 @@
-import type { VerificationType } from "@horizon/shared";
+import type {
+  CommunityNoteClassification,
+  CommunityNoteStatus,
+  VerificationType,
+} from "@horizon/shared";
 
 export interface AffiliationSummary {
   id: string;
@@ -7,6 +11,25 @@ export interface AffiliationSummary {
   verification: VerificationType;
   avatarShape: "circle" | "square";
   badge: string | null;
+}
+
+export interface ApiNote {
+  id: string;
+  postId: string;
+  author: string | null;
+  classification: CommunityNoteClassification;
+  classificationLabel: string;
+  body: string;
+  sourceUrl: string | null;
+  status: CommunityNoteStatus;
+  statusLabel: string;
+  visibleOnPost: boolean;
+  helpfulCount: number;
+  notHelpfulCount: number;
+  totalRatings: number;
+  ratingsNeeded: number;
+  publishedBy: string;
+  createdAt: string;
 }
 
 export interface ApiUser {
@@ -25,6 +48,9 @@ export interface ApiUser {
   affiliatedTo: AffiliationSummary | null;
   affiliatedAt: string | null;
   affiliateCount: number;
+  status: "ACTIVE" | "SUSPENDED";
+  isSystem: boolean;
+  loginDisabled: boolean;
   createdAt: string;
 }
 
@@ -74,4 +100,14 @@ export const api = {
     ),
   removeAffiliation: (username: string) =>
     request<{ user: ApiUser }>(`/users/${encodeURIComponent(username)}/affiliation`, { method: "DELETE" }),
+
+  listNotes: (postId?: string) =>
+    request<{ notes: ApiNote[] }>(`/notes${postId ? `?postId=${encodeURIComponent(postId)}` : ""}`),
+  notesForPost: (postId: string) =>
+    request<{ notes: ApiNote[] }>(`/notes?postId=${encodeURIComponent(postId)}&visible=true`),
+  rateNote: (id: string, helpful: boolean, rater?: string) =>
+    request<{ note: ApiNote }>(`/notes/${encodeURIComponent(id)}/ratings`, {
+      method: "POST",
+      body: JSON.stringify({ helpful, rater }),
+    }),
 };

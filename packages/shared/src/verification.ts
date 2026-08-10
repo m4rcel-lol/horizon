@@ -72,13 +72,13 @@ export function verificationPresentation(type: VerificationType): VerificationPr
 /**
  * Avatar shape for an account.
  *
- * Deliberately keyed on the tier the account holds in its own right, never on a
- * badge it displays through affiliation. Being affiliated by a business raises
- * a person's badge, but it does not make them an organisation, so they keep the
- * circular avatar.
+ * Keyed on the badge actually displayed, not on the tier the account was
+ * granted. An account raised to a business tier through affiliation is
+ * presented as an organisation — square avatar — for exactly as long as the
+ * affiliation lasts, and returns to a circular avatar the moment it ends.
  */
-export function avatarShapeFor(selfVerification: VerificationType): "circle" | "square" {
-  return verificationPresentation(selfVerification).avatarShape;
+export function avatarShapeFor(displayedVerification: VerificationType): "circle" | "square" {
+  return verificationPresentation(displayedVerification).avatarShape;
 }
 
 /** Only organisations hand out affiliations. */

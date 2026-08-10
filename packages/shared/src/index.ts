@@ -149,3 +149,5 @@ export const PERMISSIONS = {
 export type PermissionKey = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];
 
 export * from "./verification";
+
+export * from "./community-notes";

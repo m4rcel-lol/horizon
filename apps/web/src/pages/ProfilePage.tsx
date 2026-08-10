@@ -75,6 +75,8 @@ export function ProfilePage() {
                   verification={user?.effectiveVerification ?? "NONE"}
                   affiliatedTo={user?.affiliatedTo}
                   badgeClassName="w-5 h-5"
+                  badgeHref={user && user.affiliateCount > 0 ? `/${user.username}/affiliates` : undefined}
+                  badgeTitle={user && user.affiliateCount > 0 ? "See affiliated accounts" : undefined}
                 />
               </h2>
               <p className="text-[15px]" style={{ color: "var(--color-text-secondary)" }}>
@@ -95,6 +97,20 @@ export function ProfilePage() {
               </p>
             ) : null}
 
+            {user?.isSystem ? (
+              <p className="mt-1 text-[14px]" style={{ color: "var(--color-text-secondary)" }}>
+                Automated account run by this instance. It cannot be signed into, edited or suspended.
+                {user.username === "CommunityNotes" ? (
+                  <>
+                    {" "}
+                    <Link to="/notes" className="link">
+                      See the notes it publishes
+                    </Link>
+                  </>
+                ) : null}
+              </p>
+            ) : null}
+
             {user?.affiliatedTo ? (
               <p className="mt-1 text-[14px]" style={{ color: "var(--color-text-secondary)" }}>
                 Affiliated with{" "}
@@ -105,9 +121,11 @@ export function ProfilePage() {
             ) : null}
 
             {user && user.affiliateCount > 0 ? (
-              <p className="mt-1 text-[14px]" style={{ color: "var(--color-text-secondary)" }}>
-                <strong style={{ color: "var(--color-text)" }}>{user.affiliateCount}</strong> affiliated{" "}
-                {user.affiliateCount === 1 ? "account" : "accounts"}
+              <p className="mt-1 text-[14px]">
+                <Link to={`/${user.username}/affiliates`} className="hover:underline" style={{ color: "var(--color-text-secondary)" }}>
+                  <strong style={{ color: "var(--color-text)" }}>{user.affiliateCount}</strong> affiliated{" "}
+                  {user.affiliateCount === 1 ? "account" : "accounts"}
+                </Link>
               </p>
             ) : null}
 

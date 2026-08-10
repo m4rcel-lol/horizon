@@ -18,6 +18,11 @@ shape is the signal: an institution renders square, a person renders round, so a
 ministry and the minister who runs it are distinguishable at a glance without a
 second badge colour.
 
+Avatar shape follows **the badge actually displayed**, not the tier the account
+was granted. An account raised to a business tier by an affiliation is presented
+as an organisation — square avatar — for exactly as long as that affiliation
+lasts, and returns to a circular avatar the moment it is removed.
+
 Everything about how a tier presents — badge, avatar shape, label, whether it may
 affiliate — comes from `verificationPresentation()` in `@horizon/shared`. Add a
 tier there and the API and UI both follow.
@@ -73,6 +78,12 @@ affiliated, rather than leaving accounts with a badge nothing backs.
 | `GET` | `/api/users/:username/affiliates` | Accounts this organisation has affiliated |
 | `POST` | `/api/users/:username/affiliates` | This organisation affiliates `{ username }` |
 | `DELETE` | `/api/users/:username/affiliation` | End this account's affiliation |
+| `PATCH` | `/api/users/:username` | Edit display name or bio |
+| `PATCH` | `/api/users/:username/status` | Suspend or restore (`{ status }`) |
+
+Anyone can see who an organisation has affiliated: its profile links the badge
+and the affiliate count to `/<username>/affiliates`, which lists each account
+with the badge the affiliation grants it.
 
 Administrators manage all of it at `/admin/verification`.
 
@@ -86,3 +97,16 @@ The account directory is in-memory for now, like instance settings, and is
 written to move to Prisma without changing this surface. The schema is already
 in place: `User.verification`, `User.affiliatedToId`, `User.affiliatedAt` and
 the `VerificationHistory` model.
+
+## System accounts
+
+Some accounts belong to the instance rather than to a person. They are seeded on
+boot, flagged `isSystem`, and every mutation refuses with
+`SYSTEM_ACCOUNT_IMMUTABLE` (HTTP 403): they cannot be re-verified, edited,
+suspended, affiliated, or used to affiliate anyone else. `loginDisabled` marks
+them unusable for sign-in — the auth module must reject them when it lands,
+since there is no auth module to reject them today.
+
+`@CommunityNotes` is one: verified as a business so its notes carry the badge,
+and immutable so no administrator can quietly repurpose or silence it. See
+[Community Notes](community-notes.md).
