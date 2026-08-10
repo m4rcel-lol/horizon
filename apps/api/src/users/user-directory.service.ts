@@ -205,6 +205,12 @@ export class UserDirectoryService implements OnModuleInit {
     return this.present(this.require(username));
   }
 
+  /** Like get(), but returns undefined for an unknown handle instead of throwing. */
+  tryGet(username: string): PresentedUser | null {
+    const user = this.byUsername(username);
+    return user ? this.present(user) : null;
+  }
+
   create(input: { username: string; displayName: string; bio?: string; verification?: VerificationType }) {
     if (this.byUsername(input.username)) {
       throw new DirectoryError("USERNAME_TAKEN", `@${input.username} already exists.`, 409);

@@ -1,5 +1,8 @@
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { MediaIcon, PollIcon, EmojiIcon, ScheduleIcon } from "../icons";
+import { api } from "../api";
+import { PostCard } from "../components/PostCard";
 
 const tabs = [
   { id: "for-you", label: "For you" },
@@ -8,6 +11,8 @@ const tabs = [
 
 export function HomePage() {
   const [tab, setTab] = useState<(typeof tabs)[number]["id"]>("for-you");
+  const { data, isLoading } = useQuery({ queryKey: ["posts"], queryFn: () => api.listPosts() });
+  const posts = data?.posts ?? [];
 
   return (
     <div>
@@ -55,14 +60,28 @@ export function HomePage() {
         </div>
       </div>
 
-      <div className="empty-state">
-        <h2>{tab === "for-you" ? "Nothing here yet" : "Your following feed is empty"}</h2>
-        <p>
-          {tab === "for-you"
-            ? "Posts from across the instance appear here. Ranking is deterministic and non-AI — administrators control the signals."
-            : "Follow people and their posts will show up here, newest first."}
+      {isLoading ? (
+        <p className="px-4 py-6 text-[15px]" style={{ color: "var(--color-text-secondary)" }}>
+          Loading timeline…
         </p>
-      </div>
+      ) : tab === "for-you" && posts.length > 0 ? (
+        <ul>
+          {posts.map((post) => (
+            <li key={post.id}>
+              <PostCard post={post} />
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <div className="empty-state">
+          <h2>{tab === "for-you" ? "Nothing here yet" : "Your following feed is empty"}</h2>
+          <p>
+            {tab === "for-you"
+              ? "Posts from across the instance appear here. Ranking is deterministic and non-AI — administrators control the signals."
+              : "Following is chronological. Follow people and their posts show up here, newest first."}
+          </p>
+        </div>
+      )}
     </div>
   );
 }

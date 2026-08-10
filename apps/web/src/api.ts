@@ -32,6 +32,17 @@ export interface ApiNote {
   createdAt: string;
 }
 
+export interface ApiPost {
+  id: string;
+  authorUsername: string;
+  content: string;
+  createdAt: string;
+  /** Resolved at read time, so badges and avatar shape travel with the post. */
+  author: ApiUser | null;
+  /** Only notes readers rated helpful. */
+  notes: ApiNote[];
+}
+
 export interface ApiUser {
   id: string;
   username: string;
@@ -100,6 +111,12 @@ export const api = {
     ),
   removeAffiliation: (username: string) =>
     request<{ user: ApiUser }>(`/users/${encodeURIComponent(username)}/affiliation`, { method: "DELETE" }),
+
+  listPosts: (author?: string) =>
+    request<{ posts: ApiPost[] }>(`/posts${author ? `?author=${encodeURIComponent(author)}` : ""}`),
+  getPost: (id: string) => request<{ post: ApiPost }>(`/posts/${encodeURIComponent(id)}`),
+  createPost: (author: string, content: string) =>
+    request<{ post: ApiPost }>("/posts", { method: "POST", body: JSON.stringify({ author, content }) }),
 
   listNotes: (postId?: string) =>
     request<{ notes: ApiNote[] }>(`/notes${postId ? `?postId=${encodeURIComponent(postId)}` : ""}`),

@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { ArrowLeftIcon, MoreIcon } from "../icons";
 import { api, ApiError } from "../api";
 import { Avatar, NameWithBadges, VerifiedBadge } from "../components/Verification";
+import { PostCard } from "../components/PostCard";
 
 export function ProfilePage() {
   const { username } = useParams();
@@ -18,6 +19,14 @@ export function ProfilePage() {
 
   const user = data?.user;
   const notFound = error instanceof ApiError && error.status === 404;
+
+  const { data: postData } = useQuery({
+    queryKey: ["posts", handle],
+    queryFn: () => api.listPosts(handle),
+    enabled: Boolean(handle) && !notFound,
+    retry: false,
+  });
+  const posts = postData?.posts ?? [];
 
   return (
     <div>
@@ -149,10 +158,20 @@ export function ProfilePage() {
         ))}
       </div>
 
-      <div className="empty-state">
-        <h2>No posts yet</h2>
-        <p>When @{user?.username ?? handle} posts, it will show up here.</p>
-      </div>
+      {posts.length > 0 ? (
+        <ul>
+          {posts.map((post) => (
+            <li key={post.id}>
+              <PostCard post={post} />
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <div className="empty-state">
+          <h2>No posts yet</h2>
+          <p>When @{user?.username ?? handle} posts, it will show up here.</p>
+        </div>
+      )}
     </div>
   );
 }
