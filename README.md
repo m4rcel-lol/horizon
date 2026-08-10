@@ -13,7 +13,7 @@ Horizon is a production-grade, independently implemented social platform that ca
 - Polls, media (images/video), long-form posts, scheduled posts, drafts
 - Content warnings, visibility controls, edit history
 - Blocking, muting, reporting, full rule-based moderation
-- Verification (standard / business / government)
+- Verification (standard / business / government / government organisation) with affiliations
 - Comprehensive admin panel & instance configuration
 - Optional ActivityPub federation (isolated module)
 - Real-time updates via WebSockets
@@ -56,6 +56,7 @@ See the `docs/` directory:
 
 - [Installation](docs/installation.md)
 - [Configuration](docs/configuration.md)
+- [Verification & affiliation](docs/verification.md)
 - [Architecture](docs/architecture.md)
 - [Database](docs/database.md)
 - [Development](docs/development.md)

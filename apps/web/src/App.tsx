@@ -14,6 +14,7 @@ import { SetupPage } from "./pages/SetupPage";
 import { LoginPage } from "./pages/LoginPage";
 import { RegisterPage } from "./pages/RegisterPage";
 import { AdminSettingsPage } from "./pages/AdminSettingsPage";
+import { AdminVerificationPage } from "./pages/AdminVerificationPage";
 
 export default function App() {
   return (
@@ -23,6 +24,7 @@ export default function App() {
       <Route path="/setup" element={<SetupPage />} />
       <Route path="/about" element={<AboutPage />} />
       <Route path="/admin/settings" element={<AdminSettingsPage />} />
+      <Route path="/admin/verification" element={<AdminVerificationPage />} />
       <Route element={<MainLayout />}>
         <Route path="/" element={<HomePage />} />
         <Route path="/explore" element={<ExplorePage />} />

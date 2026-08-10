@@ -18,7 +18,10 @@ enum VerificationType {
   NONE
   STANDARD
   BUSINESS
+  // Government tiers share a badge; GOVERNMENT is a person holding office and
+  // GOVERNMENT_BUSINESS an institution, which renders with a square avatar.
   GOVERNMENT
+  GOVERNMENT_BUSINESS
 }
 
 enum AccountStatus {
@@ -41,7 +44,11 @@ model User {
   location          String?
   avatarUrl         String?
   bannerUrl         String?
+  // Tier granted by an administrator. The badge shown is derived from this
+  // plus any affiliation — see effectiveVerification() in @horizon/shared.
   verification      VerificationType @default(NONE)
+  affiliatedToId    String?
+  affiliatedAt      DateTime?
   status            AccountStatus  @default(ACTIVE)
   isProtected       Boolean        @default(false) // protected account
   locale            String         @default("en")
@@ -79,6 +86,8 @@ model User {
   moderationActions ModerationAction[] @relation("ModerationTarget")
   auditLogs         AuditLog[]     @relation("AuditActor")
   verificationHistory VerificationHistory[]
+  affiliatedTo      User?          @relation("Affiliation", fields: [affiliatedToId], references: [id], onDelete: SetNull)
+  affiliates        User[]         @relation("Affiliation")
   drafts            Draft[]
   scheduledPosts    ScheduledPost[]
   pollsVoted        PollVote[]
@@ -88,6 +97,7 @@ model User {
   @@index([email])
   @@index([status])
   @@index([createdAt])
+  @@index([affiliatedToId])
   @@index([lastActiveAt])
 }
 
