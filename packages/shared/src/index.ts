@@ -27,7 +27,20 @@ export type PaginatedResponse<T> = {
   };
 };
 
-export type VerificationType = "NONE" | "STANDARD" | "BUSINESS" | "GOVERNMENT";
+/**
+ * Verification tiers.
+ *
+ * Organisation tiers (BUSINESS, GOVERNMENT_BUSINESS) render with a square
+ * avatar; individual tiers keep the circular one. Government accounts of both
+ * kinds share the same badge and differ only in avatar shape, which is what
+ * distinguishes an institution from a person holding office.
+ */
+export type VerificationType =
+  | "NONE"
+  | "STANDARD"
+  | "BUSINESS"
+  | "GOVERNMENT"
+  | "GOVERNMENT_BUSINESS";
 
 export type PostVisibility = "PUBLIC" | "FOLLOWERS" | "MENTIONED" | "PRIVATE";
 
@@ -134,3 +147,5 @@ export const PERMISSIONS = {
 } as const;
 
 export type PermissionKey = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];
+
+export * from "./verification";

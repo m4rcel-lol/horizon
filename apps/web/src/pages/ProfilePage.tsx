@@ -1,10 +1,23 @@
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, Link } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import { ArrowLeftIcon, MoreIcon } from "../icons";
+import { api, ApiError } from "../api";
+import { Avatar, NameWithBadges, VerifiedBadge } from "../components/Verification";
 
 export function ProfilePage() {
   const { username } = useParams();
   const navigate = useNavigate();
-  const handle = username ?? "profile";
+  const handle = username ?? "";
+
+  const { data, isLoading, error } = useQuery({
+    queryKey: ["user", handle],
+    queryFn: () => api.getUser(handle),
+    retry: false,
+    enabled: Boolean(handle),
+  });
+
+  const user = data?.user;
+  const notFound = error instanceof ApiError && error.status === 404;
 
   return (
     <div>
@@ -13,26 +26,27 @@ export function ProfilePage() {
           <ArrowLeftIcon className="w-5 h-5" />
         </button>
         <div className="min-w-0">
-          <h1 className="x-title truncate">@{handle}</h1>
+          <h1 className="x-title truncate">{user ? user.displayName : `@${handle}`}</h1>
           <p className="text-[13px]" style={{ color: "var(--color-text-secondary)" }}>
-            Profile
+            {user ? `@${user.username}` : "Profile"}
           </p>
         </div>
       </header>
 
-      {/* Banner */}
       <div className="h-[200px]" style={{ background: "var(--color-bg-secondary)" }} />
 
       <div className="px-4 pb-3">
         <div className="flex justify-between items-start">
-          <img
-            src="/assets/default-avatar.svg"
-            alt=""
-            className="avatar w-[133px] h-[133px] -mt-[66px] border-4"
-            style={{ borderColor: "var(--color-bg)" }}
-          />
+          <div className="-mt-[66px]">
+            <Avatar shape={user?.avatarShape ?? "circle"} size={133} ring />
+          </div>
           <div className="flex items-center gap-2 pt-3">
-            <button type="button" className="icon-btn border" style={{ borderColor: "var(--color-border-strong)" }} aria-label="More">
+            <button
+              type="button"
+              className="icon-btn border"
+              style={{ borderColor: "var(--color-border-strong)" }}
+              aria-label="More"
+            >
               <MoreIcon className="w-4 h-4" />
             </button>
             <button type="button" className="btn btn-outline">
@@ -41,25 +55,72 @@ export function ProfilePage() {
           </div>
         </div>
 
-        <div className="mt-3">
-          <h2 className="text-[20px] font-extrabold leading-6">@{handle}</h2>
-          <p className="text-[15px]" style={{ color: "var(--color-text-secondary)" }}>
-            @{handle}
+        {isLoading ? (
+          <p className="mt-4 text-[15px]" style={{ color: "var(--color-text-secondary)" }}>
+            Loading profile…
           </p>
-        </div>
+        ) : notFound ? (
+          <div className="mt-4">
+            <h2 className="text-[20px] font-extrabold">This account doesn&apos;t exist</h2>
+            <p className="text-[15px] mt-1" style={{ color: "var(--color-text-secondary)" }}>
+              Try searching for another.
+            </p>
+          </div>
+        ) : (
+          <>
+            <div className="mt-3">
+              <h2 className="text-[20px] font-extrabold leading-6">
+                <NameWithBadges
+                  displayName={user?.displayName ?? `@${handle}`}
+                  verification={user?.effectiveVerification ?? "NONE"}
+                  affiliatedTo={user?.affiliatedTo}
+                  badgeClassName="w-5 h-5"
+                />
+              </h2>
+              <p className="text-[15px]" style={{ color: "var(--color-text-secondary)" }}>
+                @{user?.username ?? handle}
+              </p>
+            </div>
 
-        <p className="mt-3 text-[15px]">
-          This profile is rendered from the API once accounts exist on the instance.
-        </p>
+            {user?.bio ? <p className="mt-3 text-[15px]">{user.bio}</p> : null}
 
-        <div className="flex gap-5 mt-3 text-[14px]" style={{ color: "var(--color-text-secondary)" }}>
-          <span>
-            <strong style={{ color: "var(--color-text)" }}>—</strong> Following
-          </span>
-          <span>
-            <strong style={{ color: "var(--color-text)" }}>—</strong> Followers
-          </span>
-        </div>
+            {user && user.effectiveVerification !== "NONE" ? (
+              <p
+                className="mt-3 text-[14px] flex items-center gap-1.5"
+                style={{ color: "var(--color-text-secondary)" }}
+              >
+                <VerifiedBadge type={user.effectiveVerification} className="w-4 h-4" />
+                {user.verificationLabel}
+                {user.verification === "NONE" && user.affiliatedTo ? " through affiliation" : null}
+              </p>
+            ) : null}
+
+            {user?.affiliatedTo ? (
+              <p className="mt-1 text-[14px]" style={{ color: "var(--color-text-secondary)" }}>
+                Affiliated with{" "}
+                <Link to={`/${user.affiliatedTo.username}`} className="link">
+                  {user.affiliatedTo.displayName}
+                </Link>
+              </p>
+            ) : null}
+
+            {user && user.affiliateCount > 0 ? (
+              <p className="mt-1 text-[14px]" style={{ color: "var(--color-text-secondary)" }}>
+                <strong style={{ color: "var(--color-text)" }}>{user.affiliateCount}</strong> affiliated{" "}
+                {user.affiliateCount === 1 ? "account" : "accounts"}
+              </p>
+            ) : null}
+
+            <div className="flex gap-5 mt-3 text-[14px]" style={{ color: "var(--color-text-secondary)" }}>
+              <span>
+                <strong style={{ color: "var(--color-text)" }}>—</strong> Following
+              </span>
+              <span>
+                <strong style={{ color: "var(--color-text)" }}>—</strong> Followers
+              </span>
+            </div>
+          </>
+        )}
       </div>
 
       <div className="x-tabs" role="tablist" aria-label="Profile sections">
@@ -72,7 +133,7 @@ export function ProfilePage() {
 
       <div className="empty-state">
         <h2>No posts yet</h2>
-        <p>When @{handle} posts, it will show up here.</p>
+        <p>When @{user?.username ?? handle} posts, it will show up here.</p>
       </div>
     </div>
   );
