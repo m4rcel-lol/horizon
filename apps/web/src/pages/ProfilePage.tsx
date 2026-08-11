@@ -12,6 +12,7 @@ import { FollowsYouChip } from "../components/FollowsYouChip";
 import { ProfileMenu } from "../components/ProfileMenu";
 import { ProfileCommunities } from "../components/CommunityCard";
 import { PageLoader } from "../components/LoadingSpinner";
+import { RichText } from "../components/RichText";
 import { useSession } from "../hooks/useSession";
 
 export function ProfilePage() {
@@ -121,7 +122,7 @@ export function ProfilePage() {
         ) : (
           <>
             <div className="mt-3">
-              <h2 className="text-[20px] font-extrabold leading-6">
+              <h2 className="text-[20px] font-extrabold leading-6 inline-flex items-center gap-1.5 flex-wrap">
                 <NameWithBadges
                   displayName={user?.displayName ?? active?.displayName ?? `@${handle}`}
                   verification={user?.effectiveVerification ?? "NONE"}
@@ -130,6 +131,11 @@ export function ProfilePage() {
                   badgeHref={user && user.affiliateCount > 0 ? `/${user.username}/affiliates` : undefined}
                   badgeTitle={user && user.affiliateCount > 0 ? "See affiliated accounts" : undefined}
                 />
+                {user?.isProtected ? (
+                  <span title="Private account" aria-label="Private account">
+                    🔒
+                  </span>
+                ) : null}
               </h2>
               <p
                 className="text-[15px] flex items-center gap-2 flex-wrap"
@@ -140,7 +146,35 @@ export function ProfilePage() {
               </p>
             </div>
 
-            {user?.bio ? <p className="mt-3 text-[15px]">{user.bio}</p> : null}
+            {user?.bio ? (
+              <p className="mt-3 text-[15px] whitespace-pre-wrap">
+                <RichText text={user.bio} />
+              </p>
+            ) : null}
+
+            <div
+              className="flex flex-wrap gap-x-4 gap-y-1 mt-2 text-[14px]"
+              style={{ color: "var(--color-text-secondary)" }}
+            >
+              {user?.pronouns ? <span>{user.pronouns}</span> : null}
+              {user?.location ? <span>📍 {user.location}</span> : null}
+              {user?.website ? (
+                <a href={user.website.startsWith("http") ? user.website : `https://${user.website}`} className="link" target="_blank" rel="noopener noreferrer">
+                  {user.website.replace(/^https?:\/\//, "")}
+                </a>
+              ) : null}
+              {user?.birthday ? <span>🎂 {user.birthday}</span> : null}
+            </div>
+
+            {user?.automatedBy ? (
+              <p className="mt-2 text-[14px] flex items-center gap-1.5" style={{ color: "var(--color-text-secondary)" }}>
+                <span aria-hidden="true">🤖</span>
+                Automated by{" "}
+                <a href={`/${user.automatedBy.username}`} className="link">
+                  @{user.automatedBy.username}
+                </a>
+              </p>
+            ) : null}
 
             {user && user.effectiveVerification !== "NONE" ? (
               <p

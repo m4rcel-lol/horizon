@@ -38,7 +38,7 @@ export const COMMUNITY_NOTE_STATUS_LABELS: Record<CommunityNoteStatus, string> =
 };
 
 /** Ratings required before a note can leave the pending state. */
-export const COMMUNITY_NOTE_MIN_RATINGS = 3;
+export const COMMUNITY_NOTE_MIN_RATINGS = 1;
 /** Share of helpful ratings at or above which a note is shown. */
 export const COMMUNITY_NOTE_HELPFUL_RATIO = 2 / 3;
 /** Share at or below which a note is rejected. */

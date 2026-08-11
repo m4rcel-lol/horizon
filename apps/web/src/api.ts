@@ -68,6 +68,7 @@ export interface ApiCommunity {
   name: string;
   description: string | null;
   avatarUrl: string | null;
+  bannerUrl?: string | null;
   memberCount: number;
   owner: { username: string; displayName: string };
   joinedByViewer: boolean;
@@ -215,7 +216,17 @@ export const api = {
     request<{ user: ApiUser }>("/users", { method: "POST", body: JSON.stringify(body) }),
   updateUser: (
     username: string,
-    body: { displayName?: string; bio?: string; avatarUrl?: string | null; bannerUrl?: string | null },
+    body: {
+      displayName?: string;
+      bio?: string;
+      avatarUrl?: string | null;
+      bannerUrl?: string | null;
+      website?: string | null;
+      location?: string | null;
+      pronouns?: string | null;
+      birthday?: string | null;
+      isProtected?: boolean;
+    },
   ) =>
     request<{ user: ApiUser }>(`/users/${encodeURIComponent(username)}`, {
       method: "PATCH",
@@ -268,16 +279,38 @@ export const api = {
     request<{ communities: ApiCommunity[] }>(`/communities?user=${encodeURIComponent(username)}`),
   community: (slug: string) =>
     request<{ community: ApiCommunity }>(`/communities/${encodeURIComponent(slug)}`),
+  getCommunity: (slug: string) =>
+    request<{ community: ApiCommunity }>(`/communities/${encodeURIComponent(slug)}`),
   createCommunity: (body: { name: string; description?: string; avatarUrl?: string }) =>
     request<{ community: ApiCommunity }>("/communities", {
       method: "POST",
       body: JSON.stringify(body),
+    }),
+  updateCommunity: (
+    slug: string,
+    body: { avatarUrl?: string | null; bannerUrl?: string | null; description?: string },
+  ) =>
+    request<{ community: ApiCommunity }>(`/communities/${encodeURIComponent(slug)}`, {
+      method: "PATCH",
+      body: JSON.stringify(body),
+    }),
+  joinCommunity: (slug: string) =>
+    request<{ community: ApiCommunity }>(`/communities/${encodeURIComponent(slug)}/membership`, {
+      method: "PUT",
+      body: JSON.stringify({ on: true }),
+    }),
+  leaveCommunity: (slug: string) =>
+    request<{ community: ApiCommunity }>(`/communities/${encodeURIComponent(slug)}/membership`, {
+      method: "PUT",
+      body: JSON.stringify({ on: false }),
     }),
   setMembership: (slug: string, on: boolean) =>
     request<{ community: ApiCommunity }>(`/communities/${encodeURIComponent(slug)}/membership`, {
       method: "PUT",
       body: JSON.stringify({ on }),
     }),
+  listCommunityPosts: (slug: string) =>
+    request<{ posts: ApiPost[] }>(`/communities/${encodeURIComponent(slug)}/posts`),
 
   // Statistics
   instanceStats: () => request<{ stats: InstanceStats }>("/stats/instance"),

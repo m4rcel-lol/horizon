@@ -173,9 +173,18 @@ export class CommunityNotesService {
    * Filtered on the stored status in the query rather than by loading every
    * note and recomputing, because this runs once per post in a timeline.
    */
-  async forPost(postId: string, viewerId: string | null = null): Promise<PresentedNote[]> {
+  async forPost(
+    postId: string,
+    viewerId: string | null = null,
+    opts: { includePending?: boolean } = {},
+  ): Promise<PresentedNote[]> {
     const notes = (await this.prisma.communityNote.findMany({
-      where: { postId, status: "HELPFUL" },
+      where: {
+        postId,
+        status: opts.includePending
+          ? { in: ["HELPFUL", "NEEDS_MORE_RATINGS"] }
+          : "HELPFUL",
+      },
       orderBy: { createdAt: "desc" },
       select: NOTE_SELECT,
     })) as NoteRow[];

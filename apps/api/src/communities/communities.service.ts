@@ -9,6 +9,7 @@ export interface PresentedCommunity {
   name: string;
   description: string | null;
   avatarUrl: string | null;
+  bannerUrl: string | null;
   memberCount: number;
   owner: { username: string; displayName: string };
   /** Whether the caller is a member, so the button reads Join or Leave. */
@@ -21,6 +22,7 @@ const COMMUNITY_SELECT = {
   name: true,
   description: true,
   avatarUrl: true,
+  bannerUrl: true,
   memberCount: true,
   owner: { select: { username: true, displayName: true } },
 } as const;
@@ -31,6 +33,7 @@ type CommunityRow = {
   name: string;
   description: string | null;
   avatarUrl: string | null;
+  bannerUrl: string | null;
   memberCount: number;
   owner: { username: string; displayName: string };
 };
@@ -209,6 +212,75 @@ export class CommunitiesService {
     });
 
     return this.get(slug, userId);
+  }
+
+  async update(
+    slug: string,
+    actorId: string,
+    changes: { avatarUrl?: string | null; bannerUrl?: string | null; description?: string },
+  ): Promise<PresentedCommunity> {
+    const community = await this.prisma.community.findUnique({
+      where: { slug },
+      select: { id: true, ownerId: true },
+    });
+    if (!community) throw new DirectoryError("COMMUNITY_NOT_FOUND", `No community ${slug}.`, 404);
+    if (community.ownerId !== actorId) {
+      throw new DirectoryError("FORBIDDEN", "Only the owner can edit this community.", 403);
+    }
+    await this.prisma.community.update({
+      where: { id: community.id },
+      data: {
+        ...(changes.avatarUrl !== undefined ? { avatarUrl: changes.avatarUrl } : {}),
+        ...(changes.bannerUrl !== undefined ? { bannerUrl: changes.bannerUrl } : {}),
+        ...(changes.description !== undefined ? { description: changes.description } : {}),
+      },
+    });
+    return this.get(slug, actorId);
+  }
+
+  /** Posts shared into this community (CommunityPost join table). */
+  async posts(slug: string, _viewerId: string | null = null) {
+    const community = await this.prisma.community.findUnique({
+      where: { slug },
+      select: { id: true },
+    });
+    if (!community) throw new DirectoryError("COMMUNITY_NOT_FOUND", `No community ${slug}.`, 404);
+    const rows = await this.prisma.communityPost.findMany({
+      where: { communityId: community.id },
+      orderBy: { createdAt: "desc" },
+      take: 50,
+      select: {
+        post: {
+          select: {
+            id: true,
+            content: true,
+            createdAt: true,
+            author: { select: { username: true } },
+          },
+        },
+      },
+    });
+    // Lightweight shape — full present goes through PostsService when wired.
+    return rows.map((r) => ({
+      id: r.post.id,
+      authorUsername: r.post.author.username,
+      content: r.post.content,
+      createdAt: r.post.createdAt.toISOString(),
+      author: null,
+      notes: [],
+      media: [],
+      likeCount: 0,
+      replyCount: 0,
+      repostCount: 0,
+      quoteCount: 0,
+      likedByViewer: false,
+      repostedByViewer: false,
+      bookmarkedByViewer: false,
+      deletableByViewer: false,
+      quoteOf: null,
+      replyTo: null,
+      poll: null,
+    }));
   }
 
   /** Whether an account may create one, so the button can be hidden rather than refused. */

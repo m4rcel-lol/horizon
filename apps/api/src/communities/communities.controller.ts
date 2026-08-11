@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpException, Param, Post, Put, Query } from "@nestjs/common";
+import { Body, Controller, Get, HttpException, Param, Patch, Post, Put, Query } from "@nestjs/common";
 import { IsBoolean, IsOptional, IsString, Length } from "class-validator";
 import { CommunitiesService } from "./communities.service";
 import { DirectoryError } from "../users/directory-error";
@@ -75,6 +75,25 @@ export class CommunitiesController {
   ) {
     return this.unwrap(async () => ({
       community: await this.communities.setMembership(slug, auth.id, body.on),
+    }));
+  }
+
+  @Patch(":slug")
+  async update(
+    @Param("slug") slug: string,
+    @Body() body: { avatarUrl?: string | null; bannerUrl?: string | null; description?: string },
+    @CurrentUser() auth: AuthenticatedUser,
+  ) {
+    return this.unwrap(async () => ({
+      community: await this.communities.update(slug, auth.id, body),
+    }));
+  }
+
+  @Public()
+  @Get(":slug/posts")
+  async posts(@Param("slug") slug: string, @CurrentUser() auth: AuthenticatedUser | null) {
+    return this.unwrap(async () => ({
+      posts: await this.communities.posts(slug, auth?.id ?? null),
     }));
   }
 }

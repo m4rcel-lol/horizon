@@ -184,7 +184,7 @@ export function PostActions({
         {repostOpen ? (
           <div
             role="menu"
-            className="absolute left-0 top-full mt-1 w-[220px] rounded-2xl border shadow-xl z-50 overflow-hidden"
+            className="absolute left-0 bottom-full mb-1 w-[220px] rounded-2xl border shadow-xl z-[200] overflow-hidden animate-pop-in"
             style={{
               background: "var(--color-bg)",
               borderColor: "var(--color-border)",
@@ -282,7 +282,7 @@ export function PostActions({
           {moreOpen ? (
             <div
               role="menu"
-              className="absolute right-0 top-full mt-1 w-[200px] rounded-2xl border shadow-xl z-50 overflow-hidden"
+              className="absolute right-0 bottom-full mb-1 w-[200px] rounded-2xl border shadow-xl z-[200] overflow-hidden animate-pop-in"
               style={{
                 background: "var(--color-bg)",
                 borderColor: "var(--color-border)",

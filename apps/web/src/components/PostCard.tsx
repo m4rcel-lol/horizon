@@ -5,6 +5,7 @@ import { CommunityNoteCard } from "./CommunityNote";
 import { PostActions } from "./PostActions";
 import { RepostIcon } from "../icons";
 import { PostMediaGrid, PostPoll } from "./PostMedia";
+import { RichText } from "./RichText";
 
 /** "3h", "2d", or a date once it stops being recent. */
 function relativeTime(iso: string): string {
@@ -140,7 +141,7 @@ export function PostCard({
       <p
         className={`whitespace-pre-wrap ${detail ? "text-[17px] leading-6 mt-3" : "text-[15px] leading-5 mt-0.5"}`}
       >
-        {post.content}
+        <RichText text={post.content} />
       </p>
 
       <PostMediaGrid media={post.media} />
@@ -148,9 +149,9 @@ export function PostCard({
 
       {post.quoteOf ? <QuotedPost post={post.quoteOf} /> : null}
 
-      {post.notes.length > 0 ? (
+      {(post.notes ?? []).length > 0 ? (
         <div className="mt-3 flex flex-col gap-3">
-          {post.notes.map((note) => (
+          {(post.notes ?? []).map((note) => (
             <CommunityNoteCard
               key={note.id}
               note={note}

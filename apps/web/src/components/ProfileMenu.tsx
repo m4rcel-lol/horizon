@@ -78,7 +78,7 @@ export function ProfileMenu({ user }: { user: ApiUser | undefined }) {
       {open ? (
         <div
           role="menu"
-          className="absolute right-0 top-full mt-1 w-[260px] rounded-2xl border shadow-xl z-50 overflow-hidden animate-pop-in"
+          className="absolute right-0 top-full mt-1 w-[260px] rounded-2xl border shadow-xl z-[200] overflow-hidden animate-pop-in"
           style={{
             background: "var(--color-bg)",
             borderColor: "var(--color-border)",

@@ -155,7 +155,7 @@ export class PostsService {
   ): Promise<PresentedPost> {
     const [author, notes, liked, reposted, bookmarked, quoted, replyParent] = await Promise.all([
       this.directory.tryGet(post.author.username),
-      this.notes.forPost(post.id, viewerId),
+      this.notes.forPost(post.id, viewerId, { includePending: true }),
       viewerId
         ? this.prisma.postLike.findUnique({
             where: { userId_postId: { userId: viewerId, postId: post.id } },

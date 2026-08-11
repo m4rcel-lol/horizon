@@ -46,8 +46,16 @@ export interface PresentedUser {
   status: AccountStatus;
   isSystem: boolean;
   loginDisabled: boolean;
+  isAdmin: boolean;
+  isProtected: boolean;
+  website: string | null;
+  location: string | null;
+  pronouns: string | null;
+  birthday: string | null;
   followingCount: number;
   followersCount: number;
+  automatedBy: { username: string; displayName: string } | null;
+  automatedPending: boolean;
   createdAt: string;
 }
 
@@ -69,6 +77,13 @@ const USER_SELECT = {
   bio: true,
   avatarUrl: true,
   bannerUrl: true,
+  website: true,
+  location: true,
+  pronouns: true,
+  birthday: true,
+  isProtected: true,
+  automatedById: true,
+  automatedPending: true,
   verification: true,
   affiliatedToId: true,
   affiliatedAt: true,
@@ -85,6 +100,13 @@ type UserRow = {
   bio: string | null;
   avatarUrl: string | null;
   bannerUrl: string | null;
+  website: string | null;
+  location: string | null;
+  pronouns: string | null;
+  birthday: Date | null;
+  isProtected: boolean;
+  automatedById: string | null;
+  automatedPending: boolean;
   verification: VerificationType;
   affiliatedToId: string | null;
   affiliatedAt: Date | null;
@@ -196,7 +218,7 @@ export class UserDirectoryService implements OnModuleInit {
     const type = effectiveVerification(user.verification, Boolean(user.affiliatedToId));
     const presentation = verificationPresentation(type);
 
-    const [parent, affiliateCount, followingCount, followersCount] = await Promise.all([
+    const [parent, affiliateCount, followingCount, followersCount, automatedBy] = await Promise.all([
       user.affiliatedToId
         ? (this.prisma.user.findUnique({
             where: { id: user.affiliatedToId },
@@ -206,6 +228,12 @@ export class UserDirectoryService implements OnModuleInit {
       this.prisma.user.count({ where: { affiliatedToId: user.id } }),
       this.prisma.follow.count({ where: { followerId: user.id } }),
       this.prisma.follow.count({ where: { followingId: user.id } }),
+      user.automatedById && !user.automatedPending
+        ? this.prisma.user.findUnique({
+            where: { id: user.automatedById },
+            select: { username: true, displayName: true },
+          })
+        : Promise.resolve(null),
     ]);
 
     return {
@@ -231,8 +259,16 @@ export class UserDirectoryService implements OnModuleInit {
       status: user.status === "SUSPENDED" ? "SUSPENDED" : "ACTIVE",
       isSystem: user.isSystem,
       loginDisabled: user.loginDisabled,
+      isAdmin: await this.userIsAdmin(user.id),
+      isProtected: Boolean(user.isProtected),
+      website: user.website ?? null,
+      location: user.location ?? null,
+      pronouns: user.pronouns ?? null,
+      birthday: user.birthday ? user.birthday.toISOString().slice(0, 10) : null,
       followingCount,
       followersCount,
+      automatedBy: automatedBy ?? null,
+      automatedPending: Boolean(user.automatedPending),
       createdAt: user.createdAt.toISOString(),
     };
   }
@@ -437,7 +473,17 @@ export class UserDirectoryService implements OnModuleInit {
   /** Edit a profile. System accounts refuse. */
   async update(
     username: string,
-    changes: { displayName?: string; bio?: string; avatarUrl?: string | null; bannerUrl?: string | null },
+    changes: {
+      displayName?: string;
+      bio?: string;
+      avatarUrl?: string | null;
+      bannerUrl?: string | null;
+      website?: string | null;
+      location?: string | null;
+      pronouns?: string | null;
+      birthday?: string | null;
+      isProtected?: boolean;
+    },
   ) {
     const user = await this.row(username);
     this.refuseIfSystem(user, "edited");
@@ -448,6 +494,13 @@ export class UserDirectoryService implements OnModuleInit {
         ...(changes.bio !== undefined ? { bio: changes.bio } : {}),
         ...(changes.avatarUrl !== undefined ? { avatarUrl: changes.avatarUrl } : {}),
         ...(changes.bannerUrl !== undefined ? { bannerUrl: changes.bannerUrl } : {}),
+        ...(changes.website !== undefined ? { website: changes.website } : {}),
+        ...(changes.location !== undefined ? { location: changes.location } : {}),
+        ...(changes.pronouns !== undefined ? { pronouns: changes.pronouns } : {}),
+        ...(changes.birthday !== undefined
+          ? { birthday: changes.birthday ? new Date(changes.birthday) : null }
+          : {}),
+        ...(changes.isProtected !== undefined ? { isProtected: changes.isProtected } : {}),
       },
     });
     return this.get(username);

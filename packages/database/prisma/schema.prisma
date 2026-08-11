@@ -49,6 +49,8 @@ model User {
   bio               String?        @db.VarChar(500)
   website           String?
   location          String?
+  pronouns          String?
+  birthday          DateTime?
   avatarUrl         String?
   bannerUrl         String?
   // Tier granted by an administrator. The badge shown is derived from this
@@ -61,7 +63,10 @@ model User {
   // cannot be signed into, edited, suspended or affiliated.
   isSystem          Boolean        @default(false)
   loginDisabled     Boolean        @default(false)
-  isProtected       Boolean        @default(false) // protected account
+  isProtected       Boolean        @default(false) // private account — follows are requests
+  // X-style automated account: when set, this account is operated by automatedBy
+  automatedById     String?
+  automatedPending  Boolean        @default(false) // request sent, not yet accepted
   locale            String         @default("en")
   timezone          String         @default("UTC")
   createdAt         DateTime       @default(now())
@@ -137,7 +142,7 @@ model UserSettings {
   // Privacy
   profileVisibility         String  @default("public") // public, followers, private
   postDefaultVisibility     String  @default("public")
-  dmPermission              String  @default("everyone") // everyone, following, none
+  dmPermission              String  @default("mutuals") // everyone, mutuals, following, none
   mentionPermission         String  @default("everyone")
   replyPermission           String  @default("everyone")
   discoverable              Boolean @default(true)
@@ -147,6 +152,7 @@ model UserSettings {
   personalizedRecommendations Boolean @default(true)
   // Preferences
   theme                     String  @default("system") // light, dark, system
+  accentColor               String  @default("#1d9bf0")
   language                  String  @default("en")
   timezone                  String  @default("UTC")
   keyboardShortcuts         Boolean @default(true)

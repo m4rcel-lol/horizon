@@ -1,5 +1,5 @@
 import { Body, Controller, Delete, Get, HttpException, Param, Patch, Post } from "@nestjs/common";
-import { IsIn, IsOptional, IsString, Length, Matches } from "class-validator";
+import { IsBoolean, IsIn, IsOptional, IsString, Length, Matches } from "class-validator";
 import { PERMISSIONS, VERIFICATION_TYPES, type VerificationType } from "@horizon/shared";
 import { DirectoryError, UserDirectoryService } from "./user-directory.service";
 import { CurrentUser, Public, RequirePermissions } from "../auth/auth.decorators";
@@ -63,6 +63,26 @@ class UpdateUserDto {
   @IsOptional()
   @IsString()
   bannerUrl?: string | null;
+
+  @IsOptional()
+  @IsString()
+  website?: string | null;
+
+  @IsOptional()
+  @IsString()
+  location?: string | null;
+
+  @IsOptional()
+  @IsString()
+  pronouns?: string | null;
+
+  @IsOptional()
+  @IsString()
+  birthday?: string | null;
+
+  @IsOptional()
+  @IsBoolean()
+  isProtected?: boolean;
 }
 
 class SetStatusDto {

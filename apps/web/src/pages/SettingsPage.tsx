@@ -134,6 +134,34 @@ export function SettingsAppearancePage() {
       <p className="mt-6 text-[13px]" style={{ color: "var(--color-text-secondary)" }}>
         Currently showing: <strong style={{ color: "var(--color-text)" }}>{theme}</strong> theme
       </p>
+
+      <h3 className="text-[17px] font-bold mt-8 mb-2">Accent colour</h3>
+      <p className="text-[14px] mb-3" style={{ color: "var(--color-text-secondary)" }}>
+        Stored on this device — each account can pick a different accent.
+      </p>
+      <div className="flex flex-wrap gap-2">
+        {["#1d9bf0", "#7856ff", "#00ba7c", "#f91880", "#ff7a00", "#e0245e"].map((color) => (
+          <button
+            key={color}
+            type="button"
+            className="w-10 h-10 rounded-full border-2"
+            style={{
+              background: color,
+              borderColor:
+                (typeof localStorage !== "undefined" && localStorage.getItem("horizon_accent") === color) ||
+                (!localStorage.getItem("horizon_accent") && color === "#1d9bf0")
+                  ? "var(--color-text)"
+                  : "transparent",
+            }}
+            aria-label={`Accent ${color}`}
+            onClick={() => {
+              localStorage.setItem("horizon_accent", color);
+              document.documentElement.style.setProperty("--color-primary", color);
+              document.documentElement.style.setProperty("--color-primary-hover", color);
+            }}
+          />
+        ))}
+      </div>
     </div>
   );
 }
@@ -216,13 +244,112 @@ export function SettingsAccountPage() {
 }
 
 export function SettingsPrivacyPage() {
+  const { active, refresh } = useSession();
+  const [isProtected, setIsProtected] = useState(Boolean(active?.isProtected));
+  const [dmPermission, setDmPermission] = useState(
+    () => localStorage.getItem("horizon_dm_permission") || "mutuals",
+  );
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    setIsProtected(Boolean(active?.isProtected));
+  }, [active?.isProtected]);
+
+  async function saveProtected(next: boolean) {
+    if (!active?.username) return;
+    setSaving(true);
+    setMessage(null);
+    try {
+      const { api } = await import("../api");
+      await api.updateUser(active.username, { isProtected: next });
+      setIsProtected(next);
+      await refresh();
+      setMessage(next ? "Account is now private." : "Account is now public.");
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : "Could not save.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function saveDm(next: string) {
+    setDmPermission(next);
+    localStorage.setItem("horizon_dm_permission", next);
+    setMessage("Message preference saved on this device.");
+  }
+
   return (
     <div className="px-4 py-4">
       <h2 className="text-[20px] font-extrabold mb-1">Privacy</h2>
-      <p className="text-[14px]" style={{ color: "var(--color-text-secondary)" }}>
-        Profile visibility, DM permissions, and mention controls will appear here once account privacy
-        settings are connected to the API.
+      <p className="text-[14px] mb-6" style={{ color: "var(--color-text-secondary)" }}>
+        Control who can follow you and who can message you.
       </p>
+
+      <section className="mb-8">
+        <h3 className="text-[17px] font-bold mb-2">Private account</h3>
+        <p className="text-[14px] mb-3" style={{ color: "var(--color-text-secondary)" }}>
+          When enabled, new follows must be approved. Your profile posts stay hidden from people who
+          do not follow you. Replies you leave on others&apos; posts remain visible.
+        </p>
+        <label className="flex items-center gap-3 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={isProtected}
+            disabled={saving || !active}
+            onChange={(e) => saveProtected(e.target.checked)}
+            className="accent-[var(--color-primary)] w-5 h-5"
+          />
+          <span className="font-bold text-[15px]">Protect your posts</span>
+        </label>
+      </section>
+
+      <section>
+        <h3 className="text-[17px] font-bold mb-2">Who can message me</h3>
+        <p className="text-[14px] mb-3" style={{ color: "var(--color-text-secondary)" }}>
+          Default is mutuals. Choosing nobody replaces the message button with a mention composer.
+        </p>
+        <fieldset className="space-y-2">
+          {(
+            [
+              { value: "everyone", label: "Everyone", hint: "Anyone can send you a DM" },
+              { value: "mutuals", label: "Mutuals", hint: "Only people you follow back" },
+              { value: "following", label: "People you follow", hint: "Anyone you follow" },
+              { value: "none", label: "Nobody", hint: "DMs off — message becomes a mention" },
+            ] as const
+          ).map((opt) => (
+            <label
+              key={opt.value}
+              className="flex items-center gap-3 px-3 py-3 rounded-xl cursor-pointer border"
+              style={{
+                borderColor: dmPermission === opt.value ? "var(--color-primary)" : "var(--color-border)",
+                background: dmPermission === opt.value ? "var(--color-bg-secondary)" : "transparent",
+              }}
+            >
+              <input
+                type="radio"
+                name="dm"
+                value={opt.value}
+                checked={dmPermission === opt.value}
+                onChange={() => saveDm(opt.value)}
+                className="accent-[var(--color-primary)]"
+              />
+              <span className="flex-1">
+                <span className="block font-bold text-[15px]">{opt.label}</span>
+                <span className="block text-[13px]" style={{ color: "var(--color-text-secondary)" }}>
+                  {opt.hint}
+                </span>
+              </span>
+            </label>
+          ))}
+        </fieldset>
+      </section>
+
+      {message ? (
+        <p className="mt-4 text-[14px]" style={{ color: "var(--color-text-secondary)" }} role="status">
+          {message}
+        </p>
+      ) : null}
     </div>
   );
 }

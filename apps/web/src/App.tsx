@@ -10,6 +10,8 @@ import { MessagesPage } from "./pages/MessagesPage";
 import { BookmarksPage } from "./pages/BookmarksPage";
 import { ListsPage } from "./pages/ListsPage";
 import { CommunitiesPage } from "./pages/CommunitiesPage";
+import { CommunityPage } from "./pages/CommunityPage";
+import { HashtagPage } from "./pages/HashtagPage";
 import { ProfilePage } from "./pages/ProfilePage";
 import { AffiliatesPage } from "./pages/AffiliatesPage";
 import { FollowListPage } from "./pages/FollowListPage";
@@ -27,7 +29,6 @@ import { AdminOverviewPage } from "./pages/AdminOverviewPage";
 import { AdminStatisticsPage } from "./pages/AdminStatisticsPage";
 import { AdminNotesPage } from "./pages/AdminNotesPage";
 import { UserStatsPage } from "./pages/UserStatsPage";
-import { CommunityPage } from "./pages/CommunitiesPage";
 import { PERMISSIONS } from "@horizon/shared";
 import { PrivacyPage } from "./pages/PrivacyPage";
 import { TermsPage } from "./pages/TermsPage";
@@ -120,6 +121,8 @@ export default function App() {
         <Route path="/notes" element={<CommunityNotesPage />} />
         <Route path="/lists" element={<ListsPage />} />
         <Route path="/communities" element={<CommunitiesPage />} />
+        <Route path="/c/:slug" element={<CommunityPage />} />
+        <Route path="/hashtag/:tag" element={<HashtagPage />} />
         <Route path="/profile" element={<ProfilePage />} />
         <Route path="/settings" element={<SettingsPage />}>
           <Route path="appearance" element={<SettingsAppearancePage />} />
