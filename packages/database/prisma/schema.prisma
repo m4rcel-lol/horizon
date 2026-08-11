@@ -2,12 +2,16 @@
 // Production-grade PostgreSQL schema for the social platform
 
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
 }
 
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+  // Usernames and emails are compared case-insensitively (@db.Citext), which
+  // needs this extension present before the tables are created.
+  extensions = [citext]
 }
 
 // ============================================================================

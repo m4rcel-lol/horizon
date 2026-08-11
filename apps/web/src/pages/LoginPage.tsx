@@ -1,60 +1,57 @@
-import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useState, type FormEvent } from "react";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { ApiError } from "../api";
 import { useSession } from "../hooks/useSession";
 
 export function LoginPage() {
   const navigate = useNavigate();
-  const { loginLocal } = useSession();
+  const [params] = useSearchParams();
+  const { signIn } = useSession();
+  // The account switcher links here with the handle it wants signed in.
+  const [identifier, setIdentifier] = useState(params.get("u") ?? "");
+  const [password, setPassword] = useState("");
   const [staySignedIn, setStaySignedIn] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
 
-  async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
+  async function onSubmit(event: FormEvent) {
+    event.preventDefault();
+    setBusy(true);
     setError(null);
-    const fd = new FormData(e.currentTarget);
-    const username = String(fd.get("username") || "").trim();
-    const password = String(fd.get("password") || "");
-
-    if (!username || !password) {
-      setError("Enter username and password.");
-      return;
+    try {
+      await signIn(identifier.trim(), password, staySignedIn);
+      navigate("/home", { replace: true });
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Could not sign in. Try again.");
+    } finally {
+      setBusy(false);
     }
-
-    // Until AuthModule is fully wired, persist a local session so multi-account
-    // switching and "stay signed in" work end-to-end in the UI.
-    // Replace this block with POST /api/auth/login when the server is ready.
-    if (staySignedIn) {
-      const id =
-        typeof crypto !== "undefined" && crypto.randomUUID
-          ? crypto.randomUUID()
-          : `local-${Date.now()}`;
-      loginLocal({
-        userId: id,
-        username: username.replace(/^@/, "").split("@")[0],
-        displayName: username.replace(/^@/, "").split("@")[0],
-        avatarUrl: null,
-        token: `pending-${id}`,
-        expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-        lastUsedAt: new Date().toISOString(),
-      });
-    }
-
-    navigate("/");
   }
 
   return (
     <div className="min-h-screen flex flex-col items-center px-6 py-10">
-      <img src="/assets/logo.svg" alt="Horizon" className="w-10 h-10 mb-10" />
+      <Link to="/" aria-label="Horizon">
+        <img src="/assets/logo.svg" alt="Horizon" className="w-10 h-10 mb-10" />
+      </Link>
 
       <div className="w-full max-w-[364px]">
         <h1 className="text-[31px] font-extrabold leading-9 mb-8 tracking-tight">Sign in to Horizon</h1>
 
         <form className="flex flex-col gap-6" onSubmit={onSubmit}>
           <div className="relative">
-            <label htmlFor="username" className="x-label">
+            <label htmlFor="identifier" className="x-label">
               Username or email
             </label>
-            <input id="username" name="username" type="text" autoComplete="username" required className="x-field" />
+            <input
+              id="identifier"
+              name="identifier"
+              type="text"
+              autoComplete="username"
+              required
+              value={identifier}
+              onChange={(e) => setIdentifier(e.target.value)}
+              className="x-field"
+            />
           </div>
 
           <div className="relative">
@@ -67,6 +64,8 @@ export function LoginPage() {
               type="password"
               autoComplete="current-password"
               required
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
               className="x-field"
             />
           </div>
@@ -81,22 +80,22 @@ export function LoginPage() {
             Stay signed in on this device
           </label>
           <p className="text-[13px] -mt-4" style={{ color: "var(--color-text-secondary)" }}>
-            Saves this account so you can switch profiles and stay logged in after closing the
-            browser. Passwords are never stored.
+            Keeps you signed in after closing the browser. Turn it off on a shared computer and the
+            session ends when you close it. Passwords are never stored on the device.
           </p>
 
           {error ? (
-            <p className="text-[14px] text-red-500" role="alert">
+            <p
+              role="alert"
+              className="text-[14px] rounded-2xl p-3"
+              style={{ background: "var(--color-bg-secondary)", color: "var(--color-danger)" }}
+            >
               {error}
             </p>
           ) : null}
 
-          <button type="submit" className="btn btn-primary btn-lg w-full">
-            Sign in
-          </button>
-
-          <button type="button" className="btn btn-outline btn-lg w-full">
-            Forgot password?
+          <button type="submit" className="btn btn-primary btn-lg w-full" disabled={busy}>
+            {busy ? "Signing in…" : "Sign in"}
           </button>
         </form>
 

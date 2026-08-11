@@ -97,14 +97,15 @@ export function SettingsAppearancePage() {
 }
 
 export function SettingsAccountPage() {
-  const { accounts, active, switchAccount, logout, logoutAll } = useSession();
+  const { accounts, active, logout, logoutAll } = useSession();
 
   return (
     <div className="px-4 py-4">
       <h2 className="text-[20px] font-extrabold mb-1">Account</h2>
       <p className="text-[14px] mb-6" style={{ color: "var(--color-text-secondary)" }}>
-        Switch between accounts on this device. Sessions are saved so you stay signed in after closing
-        the browser. Passwords are never stored — only server-issued session tokens.
+        Accounts you have used on this device. You stay signed in after closing the browser unless you
+        turn that off when signing in. Switching asks for that account&apos;s password, because a
+        session belongs to exactly one account — passwords are never stored on the device.
       </p>
 
       {accounts.length === 0 ? (
@@ -120,7 +121,7 @@ export function SettingsAccountPage() {
       ) : (
         <ul className="space-y-2">
           {accounts.map((a) => {
-            const isActive = active?.userId === a.userId;
+            const isActive = active?.id === a.userId;
             return (
               <li
                 key={a.userId}
@@ -142,13 +143,12 @@ export function SettingsAccountPage() {
                   </p>
                 </div>
                 {!isActive ? (
-                  <button
-                    type="button"
+                  <Link
+                    to={`/login?u=${encodeURIComponent(a.username)}`}
                     className="btn btn-outline text-[13px] !py-1.5 !px-3"
-                    onClick={() => switchAccount(a.userId)}
                   >
                     Switch
-                  </button>
+                  </Link>
                 ) : null}
                 <button type="button" className="text-[13px] link" onClick={() => logout(a.userId)}>
                   Remove

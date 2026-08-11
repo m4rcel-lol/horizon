@@ -31,7 +31,7 @@ export function MainLayout() {
   const [moreOpen, setMoreOpen] = useState(false);
   const moreRef = useRef<HTMLLIElement>(null);
   const navigate = useNavigate();
-  const { accounts, active, switchAccount, logout, isAuthenticated } = useSession();
+  const { accounts, active, logout, isAuthenticated } = useSession();
 
   useEffect(() => {
     const onDoc = (e: MouseEvent) => {
@@ -136,15 +136,12 @@ export function MainLayout() {
                           Accounts
                         </div>
                         {accounts.map((a) => (
-                          <button
+                          <Link
                             key={a.userId}
-                            type="button"
+                            to={active?.id === a.userId ? `/${a.username}` : `/login?u=${encodeURIComponent(a.username)}`}
                             role="menuitem"
                             className="flex items-center gap-3 w-full px-4 py-2.5 hover:bg-[var(--color-bg-secondary)] text-left"
-                            onClick={() => {
-                              switchAccount(a.userId);
-                              setMoreOpen(false);
-                            }}
+                            onClick={() => setMoreOpen(false)}
                           >
                             <img
                               src={a.avatarUrl || "/assets/default-avatar.svg"}
@@ -160,10 +157,10 @@ export function MainLayout() {
                                 style={{ color: "var(--color-text-secondary)" }}
                               >
                                 @{a.username}
-                                {active?.userId === a.userId ? " · Active" : ""}
+                                {active?.id === a.userId ? " · Active" : " · Sign in to switch"}
                               </span>
                             </span>
-                          </button>
+                          </Link>
                         ))}
                       </>
                     ) : null}
@@ -207,14 +204,14 @@ export function MainLayout() {
               </li>
             </ul>
 
-            <button
-              type="button"
+            <Link
+              to="/home#composer"
               className="btn btn-primary mt-4 w-[50px] h-[50px] xl:w-full xl:min-h-[52px] p-0 xl:px-8 text-[17px] self-center xl:self-auto"
               aria-label="Post"
             >
               <span className="hidden xl:inline">Post</span>
               <ComposeIcon className="w-6 h-6 xl:hidden" />
-            </button>
+            </Link>
 
             {/* Active account chip */}
             <div className="mt-auto mb-3 flex xl:justify-start justify-center">
@@ -321,13 +318,13 @@ export function MainLayout() {
         </Link>
       </nav>
 
-      <button
-        type="button"
+      <Link
+        to="/home#composer"
         className="md:hidden fixed right-4 bottom-[69px] w-14 h-14 rounded-full btn btn-primary shadow-lg z-50"
         aria-label="Post"
       >
         <ComposeIcon className="w-6 h-6" />
-      </button>
+      </Link>
     </div>
   );
 }

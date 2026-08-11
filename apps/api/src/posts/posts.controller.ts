@@ -23,9 +23,9 @@ class CreatePostDto {
 export class PostsController {
   constructor(private readonly posts: PostsService) {}
 
-  private unwrap<T>(fn: () => T): T {
+  private async unwrap<T>(fn: () => Promise<T> | T): Promise<T> {
     try {
-      return fn();
+      return await fn();
     } catch (error) {
       if (error instanceof DirectoryError) {
         throw new HttpException({ error: { code: error.code, message: error.message } }, error.status);
@@ -36,17 +36,17 @@ export class PostsController {
 
   /** The timeline, newest first. `author` narrows it to one account. */
   @Get()
-  list(@Query("author") author?: string) {
-    return { posts: this.posts.list(author) };
+  async list(@Query("author") author?: string) {
+    return { posts: await this.posts.list(author) };
   }
 
   @Post()
-  create(@Body() body: CreatePostDto) {
-    return this.unwrap(() => ({ post: this.posts.create(body) }));
+  async create(@Body() body: CreatePostDto) {
+    return this.unwrap(async () => ({ post: await this.posts.create(body) }));
   }
 
   @Get(":id")
-  get(@Param("id") id: string) {
-    return this.unwrap(() => ({ post: this.posts.get(id) }));
+  async get(@Param("id") id: string) {
+    return this.unwrap(async () => ({ post: await this.posts.get(id) }));
   }
 }
