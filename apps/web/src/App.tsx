@@ -12,6 +12,7 @@ import { ListsPage } from "./pages/ListsPage";
 import { CommunitiesPage } from "./pages/CommunitiesPage";
 import { ProfilePage } from "./pages/ProfilePage";
 import { AffiliatesPage } from "./pages/AffiliatesPage";
+import { FollowListPage } from "./pages/FollowListPage";
 import { CommunityNotesPage } from "./pages/CommunityNotesPage";
 import { PostPage } from "./pages/PostPage";
 import { AboutPage } from "./pages/AboutPage";
@@ -92,6 +93,8 @@ export default function App() {
           <Route path="privacy" element={<SettingsPrivacyPage />} />
         </Route>
         <Route path="/:username/affiliates" element={<AffiliatesPage />} />
+        <Route path="/:username/followers" element={<FollowListPage mode="followers" />} />
+        <Route path="/:username/following" element={<FollowListPage mode="following" />} />
         <Route path="/:username" element={<ProfilePage />} />
         <Route path="/:username/status/:postId" element={<PostPage />} />
       </Route>

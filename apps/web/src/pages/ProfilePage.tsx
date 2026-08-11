@@ -7,6 +7,7 @@ import { Avatar, NameWithBadges, VerifiedBadge } from "../components/Verificatio
 import { PostCard } from "../components/PostCard";
 import { EditProfileModal } from "../components/EditProfileModal";
 import { ComposerModal, type ComposerTarget } from "../components/ComposerModal";
+import { FollowButton } from "../components/FollowButton";
 import { PageLoader } from "../components/LoadingSpinner";
 import { useSession } from "../hooks/useSession";
 
@@ -106,11 +107,9 @@ export function ProfilePage() {
               <button type="button" className="btn btn-outline" onClick={() => setEditOpen(true)}>
                 Edit profile
               </button>
-            ) : (
-              <button type="button" className="btn btn-outline">
-                Follow
-              </button>
-            )}
+            ) : user ? (
+              <FollowButton username={user.username} />
+            ) : null}
           </div>
         </div>
 
@@ -190,13 +189,15 @@ export function ProfilePage() {
               </p>
             ) : null}
 
+            {/* Counts link to the lists behind them, which is the only way to
+                find out who those people actually are. */}
             <div className="flex gap-5 mt-3 text-[14px]" style={{ color: "var(--color-text-secondary)" }}>
-              <span>
+              <Link to={`/${user?.username ?? handle}/following`} className="hover:underline">
                 <strong style={{ color: "var(--color-text)" }}>{following}</strong> Following
-              </span>
-              <span>
+              </Link>
+              <Link to={`/${user?.username ?? handle}/followers`} className="hover:underline">
                 <strong style={{ color: "var(--color-text)" }}>{followers}</strong> Followers
-              </span>
+              </Link>
             </div>
           </>
         )}

@@ -64,6 +64,7 @@ See the `docs/` directory:
 - [Configuration](docs/configuration.md)
 - [Authentication & sessions](docs/authentication.md)
 - [Authorization & permissions](docs/authorization.md)
+- [Following, notifications, bookmarks & search](docs/social.md)
 - [Verification & affiliation](docs/verification.md)
 - [Community Notes](docs/community-notes.md)
 - [Architecture](docs/architecture.md)

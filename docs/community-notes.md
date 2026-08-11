@@ -64,6 +64,8 @@ come from it rather than from the request body. That matters for the threshold:
 it assumes distinct raters, and a client-supplied name let one reader clear it
 alone. See [`authorization.md`](authorization.md).
 
-Notes are stored in memory for now, like instance settings and the account
-directory, and are written to move to Prisma without changing this surface. The
+Notes and ratings are stored in Postgres. `status` is denormalised onto the row
+so a timeline can filter to visible notes without recounting ratings for every
+post it renders; it is recomputed inside the same transaction as the rating that
+changed it, so it cannot fall out of step with the counts. The
 `CommunityNote` and `CommunityNoteRating` models are already in the schema.

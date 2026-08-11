@@ -41,9 +41,9 @@ class RateNoteDto {
 export class CommunityNotesController {
   constructor(private readonly notes: CommunityNotesService) {}
 
-  private unwrap<T>(fn: () => T): T {
+  private async unwrap<T>(fn: () => Promise<T>): Promise<T> {
     try {
-      return fn();
+      return await fn();
     } catch (error) {
       if (error instanceof DirectoryError) {
         throw new HttpException({ error: { code: error.code, message: error.message } }, error.status);
@@ -55,25 +55,39 @@ export class CommunityNotesController {
   /** All notes, or those for one post. `visible=true` returns only helpful ones. */
   @Public()
   @Get()
-  list(@Query("postId") postId?: string, @Query("visible") visible?: string) {
-    const notes = visible === "true" && postId ? this.notes.forPost(postId) : this.notes.list(postId);
+  async list(
+    @CurrentUser() auth: AuthenticatedUser | null,
+    @Query("postId") postId?: string,
+    @Query("visible") visible?: string,
+  ) {
+    const viewer = auth?.id ?? null;
+    const notes =
+      visible === "true" && postId
+        ? await this.notes.forPost(postId, viewer)
+        : await this.notes.list(postId, viewer);
     return { notes };
   }
 
   @Post()
-  create(@Body() body: CreateNoteDto, @CurrentUser() auth: AuthenticatedUser) {
-    return this.unwrap(() => ({ note: this.notes.create({ ...body, author: auth.username }) }));
+  async create(@Body() body: CreateNoteDto, @CurrentUser() auth: AuthenticatedUser) {
+    return this.unwrap(async () => ({
+      note: await this.notes.create({ ...body, authorId: auth.id }),
+    }));
   }
 
   @Public()
   @Get(":id")
-  get(@Param("id") id: string) {
-    return this.unwrap(() => ({ note: this.notes.get(id) }));
+  async get(@Param("id") id: string, @CurrentUser() auth: AuthenticatedUser | null) {
+    return this.unwrap(async () => ({ note: await this.notes.get(id, auth?.id ?? null) }));
   }
 
   /** One account, one rating: rating again replaces the previous one. */
   @Post(":id/ratings")
-  rate(@Param("id") id: string, @Body() body: RateNoteDto, @CurrentUser() auth: AuthenticatedUser) {
-    return this.unwrap(() => ({ note: this.notes.rate(id, auth.id, body.helpful) }));
+  async rate(
+    @Param("id") id: string,
+    @Body() body: RateNoteDto,
+    @CurrentUser() auth: AuthenticatedUser,
+  ) {
+    return this.unwrap(async () => ({ note: await this.notes.rate(id, auth.id, body.helpful) }));
   }
 }

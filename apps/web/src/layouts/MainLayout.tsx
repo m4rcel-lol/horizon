@@ -17,6 +17,8 @@ import {
 import { useSession } from "../hooks/useSession";
 import { MobileTopBar, MobileDrawer, MobileBottomNav } from "../components/MobileNav";
 import { PERMISSIONS } from "@horizon/shared";
+import { useQuery } from "@tanstack/react-query";
+import { api } from "../api";
 
 const navItems = [
   { to: "/", label: "Home", icon: HomeIcon, end: true },
@@ -42,6 +44,7 @@ export function MainLayout() {
    * only when it genuinely does not fit and there is more space above.
    */
   const [moreDropsUp, setMoreDropsUp] = useState(false);
+  const [search, setSearch] = useState("");
   const moreRef = useRef<HTMLLIElement>(null);
   const accountRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
@@ -50,6 +53,17 @@ export function MainLayout() {
   // the public user object must not say who the administrators are.
   const canAdminister =
     can(PERMISSIONS.SETTINGS_VIEW) || can(PERMISSIONS.VERIFICATION_GRANT);
+
+  // One count, polled while the tab is open, so the badge is current without
+  // loading the notifications themselves.
+  const { data: unread } = useQuery({
+    queryKey: ["unread-notifications"],
+    queryFn: api.unreadNotifications,
+    enabled: isAuthenticated,
+    refetchInterval: 60_000,
+    retry: false,
+  });
+  const unreadCount = unread?.count ?? 0;
 
   useEffect(() => {
     const onDoc = (e: MouseEvent) => {
@@ -95,7 +109,18 @@ export function MainLayout() {
                     end={end}
                     className={({ isActive }) => `nav-item ${isActive ? "font-bold" : "font-normal"}`}
                   >
-                    <Icon className="w-[26.25px] h-[26.25px] shrink-0" />
+                    <span className="relative shrink-0">
+                      <Icon className="w-[26.25px] h-[26.25px]" />
+                      {to === "/notifications" && unreadCount > 0 ? (
+                        <span
+                          className="absolute -top-1 -right-1.5 min-w-[18px] h-[18px] px-1 rounded-full text-[11px] font-bold flex items-center justify-center"
+                          style={{ background: "var(--color-primary)", color: "#fff" }}
+                          aria-label={`${unreadCount} unread`}
+                        >
+                          {unreadCount > 99 ? "99+" : unreadCount}
+                        </span>
+                      ) : null}
+                    </span>
                     <span className="hidden xl:inline pr-4">{label}</span>
                   </NavLink>
                 </li>
@@ -374,13 +399,27 @@ export function MainLayout() {
 
         <aside className="hidden lg:block w-[350px] shrink-0 px-8 py-1 sticky top-0 h-screen overflow-y-auto">
           <div className="sticky top-0 py-2 z-10" style={{ background: "var(--color-bg)" }}>
-            <div className="relative">
+            <form
+              className="relative"
+              onSubmit={(event) => {
+                event.preventDefault();
+                const q = search.trim();
+                if (q) navigate(`/explore?q=${encodeURIComponent(q)}`);
+              }}
+            >
               <SearchIcon
                 className="w-[18px] h-[18px] absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none"
                 style={{ color: "var(--color-text-secondary)" }}
               />
-              <input type="search" placeholder="Search" className="x-search" aria-label="Search Horizon" />
-            </div>
+              <input
+                type="search"
+                placeholder="Search"
+                className="x-search"
+                aria-label="Search Horizon"
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+              />
+            </form>
           </div>
 
           <section className="card mt-3 overflow-hidden" aria-labelledby="trends-heading">

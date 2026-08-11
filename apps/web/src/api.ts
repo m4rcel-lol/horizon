@@ -51,6 +51,25 @@ export interface ApiPost {
   /** The post this one quotes, embedded one level deep. */
   quoteOf: ApiPost | null;
   replyTo: { id: string; authorUsername: string } | null;
+  bookmarkedByViewer: boolean;
+  /** Whether the caller may delete it, so the menu only offers what will work. */
+  deletableByViewer: boolean;
+}
+
+export interface ApiNotification {
+  id: string;
+  type: "LIKE" | "REPLY" | "REPOST" | "QUOTE" | "MENTION" | "FOLLOW";
+  actor: ApiUser | null;
+  postId: string | null;
+  excerpt: string | null;
+  read: boolean;
+  createdAt: string;
+}
+
+export interface Relationship {
+  following: boolean;
+  followsYou: boolean;
+  isSelf: boolean;
 }
 
 export interface ApiUser {
@@ -148,6 +167,41 @@ export const api = {
       `/users/${encodeURIComponent(organisation)}/affiliates`,
       { method: "POST", body: JSON.stringify({ username }) },
     ),
+  // Follows
+  setFollow: (username: string, on: boolean) =>
+    request<{ user: ApiUser; following: boolean }>(
+      `/users/${encodeURIComponent(username)}/follow`,
+      { method: "PUT", body: JSON.stringify({ on }) },
+    ),
+  relationship: (username: string) =>
+    request<Relationship>(`/users/${encodeURIComponent(username)}/relationship`),
+  followers: (username: string) =>
+    request<{ users: ApiUser[] }>(`/users/${encodeURIComponent(username)}/followers`),
+  followingList: (username: string) =>
+    request<{ users: ApiUser[] }>(`/users/${encodeURIComponent(username)}/following`),
+
+  // Notifications
+  notifications: (filter?: "mentions") =>
+    request<{ notifications: ApiNotification[] }>(
+      `/notifications${filter ? `?filter=${filter}` : ""}`,
+    ),
+  unreadNotifications: () => request<{ count: number }>("/notifications/unread-count"),
+  markNotificationsRead: () => request<{ read: number }>("/notifications/read", { method: "POST" }),
+
+  // Bookmarks
+  bookmarks: () => request<{ posts: ApiPost[] }>("/bookmarks"),
+  setBookmark: (postId: string, on: boolean) =>
+    request<{ bookmarked: boolean }>(`/bookmarks/${encodeURIComponent(postId)}`, {
+      method: "PUT",
+      body: JSON.stringify({ on }),
+    }),
+
+  // Search
+  search: (q: string) =>
+    request<{ query: string; users: ApiUser[]; posts: ApiPost[] }>(
+      `/search?q=${encodeURIComponent(q)}`,
+    ),
+
   removeAffiliation: (username: string) =>
     request<{ user: ApiUser }>(`/users/${encodeURIComponent(username)}/affiliation`, { method: "DELETE" }),
 
@@ -160,7 +214,10 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ content, ...options }),
     }),
+  followingTimeline: () => request<{ posts: ApiPost[] }>("/posts/following"),
   replies: (id: string) => request<{ posts: ApiPost[] }>(`/posts/${encodeURIComponent(id)}/replies`),
+  deletePost: (id: string) =>
+    request<{ deleted: boolean }>(`/posts/${encodeURIComponent(id)}`, { method: "DELETE" }),
   // PUT the state you want: a double tap cannot leave the count drifting.
   setLike: (id: string, on: boolean) =>
     request<{ post: ApiPost }>(`/posts/${encodeURIComponent(id)}/like`, {

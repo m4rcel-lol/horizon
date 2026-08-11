@@ -93,9 +93,8 @@ by the organisation itself or by someone holding `verification.grant`; removing
 an affiliation may also be done by the affiliate leaving. See
 [`authorization.md`](authorization.md).
 
-The account directory is in-memory for now, like instance settings, and is
-written to move to Prisma without changing this surface. The schema is already
-in place: `User.verification`, `User.affiliatedToId`, `User.affiliatedAt` and
+Accounts, tiers and affiliations are stored in Postgres: `User.verification`,
+`User.affiliatedToId`, `User.affiliatedAt`, and every grant and revocation in
 the `VerificationHistory` model.
 
 ## System accounts

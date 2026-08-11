@@ -15,10 +15,16 @@ const tabs = [
 
 export function HomePage() {
   const [tab, setTab] = useState<(typeof tabs)[number]["id"]>("for-you");
-  const { data, isLoading } = useQuery({ queryKey: ["posts"], queryFn: () => api.listPosts() });
-  const posts = data?.posts ?? [];
-
   const { active } = useSession();
+
+  // Two separate queries rather than one filtered client-side: the Following
+  // feed is a different set of rows, not a subset of what For you returned.
+  const { data, isLoading } = useQuery({
+    queryKey: ["posts", tab],
+    queryFn: () => (tab === "following" ? api.followingTimeline() : api.listPosts()),
+    enabled: tab === "for-you" || Boolean(active),
+  });
+  const posts = data?.posts ?? [];
   const queryClient = useQueryClient();
   const [draft, setDraft] = useState("");
   const composerRef = useRef<HTMLTextAreaElement>(null);
@@ -118,7 +124,12 @@ export function HomePage() {
         <p className="px-4 py-6 text-[15px]" style={{ color: "var(--color-text-secondary)" }}>
           Loading timeline…
         </p>
-      ) : tab === "for-you" && posts.length > 0 ? (
+      ) : tab === "following" && !active ? (
+        <div className="empty-state">
+          <h2>Sign in to see your following feed</h2>
+          <p>Following is chronological: the accounts you follow, newest first.</p>
+        </div>
+      ) : posts.length > 0 ? (
         <ul>
           {posts.map((post) => (
             <li key={post.id}>
