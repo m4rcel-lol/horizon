@@ -15,6 +15,7 @@ import {
   SettingsIcon,
 } from "../icons";
 import { useSession } from "../hooks/useSession";
+import { MobileTopBar, MobileDrawer, MobileBottomNav } from "../components/MobileNav";
 
 const navItems = [
   { to: "/", label: "Home", icon: HomeIcon, end: true },
@@ -29,6 +30,7 @@ const navItems = [
 
 export function MainLayout() {
   const [moreOpen, setMoreOpen] = useState(false);
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const moreRef = useRef<HTMLLIElement>(null);
   const navigate = useNavigate();
   const { accounts, active, logout, isAuthenticated } = useSession();
@@ -242,9 +244,15 @@ export function MainLayout() {
         </div>
 
         <main
-          className="flex-1 min-w-0 w-full max-w-[600px] border-x pb-16 md:pb-0"
-          style={{ borderColor: "var(--color-border)" }}
+          className="flex-1 min-w-0 w-full max-w-[600px] border-x md:!pb-0"
+          style={{
+            borderColor: "var(--color-border)",
+            // Clear the fixed bottom bar plus the home-indicator area. The bar
+            // is phone-only, so this is undone from md upward by md:!pb-0.
+            paddingBottom: "calc(60px + env(safe-area-inset-bottom))",
+          }}
         >
+          <MobileTopBar onOpenDrawer={() => setDrawerOpen(true)} />
           <Outlet />
         </main>
 
@@ -297,34 +305,8 @@ export function MainLayout() {
         </aside>
       </div>
 
-      <nav
-        className="md:hidden fixed bottom-0 inset-x-0 flex justify-around items-center h-[53px] border-t z-50"
-        style={{ borderColor: "var(--color-border)", background: "var(--color-bg)" }}
-        aria-label="Primary"
-      >
-        {navItems.slice(0, 4).map(({ to, label, icon: Icon, end }) => (
-          <NavLink
-            key={to}
-            to={to}
-            end={end}
-            className={({ isActive }) => `p-3 ${isActive ? "" : "opacity-60"}`}
-            aria-label={label}
-          >
-            <Icon className="w-[26px] h-[26px]" />
-          </NavLink>
-        ))}
-        <Link to="/settings" className="p-3 opacity-60" aria-label="Settings">
-          <SettingsIcon className="w-[26px] h-[26px]" />
-        </Link>
-      </nav>
-
-      <Link
-        to="/home#composer"
-        className="md:hidden fixed right-4 bottom-[69px] w-14 h-14 rounded-full btn btn-primary shadow-lg z-50"
-        aria-label="Post"
-      >
-        <ComposeIcon className="w-6 h-6" />
-      </Link>
+      <MobileDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} />
+      <MobileBottomNav />
     </div>
   );
 }

@@ -199,3 +199,20 @@ export function VerifiedIcon(props: IconProps) {
     </svg>
   );
 }
+
+export function SettingsGearIcon(props: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true" {...props}>
+      <circle cx="12" cy="12" r="3.2" />
+      <path d="M19.4 13.5a7.7 7.7 0 000-3l1.7-1.3-1.8-3.1-2 .8a7.6 7.6 0 00-2.6-1.5L14.4 3h-3.6l-.3 2.4a7.6 7.6 0 00-2.6 1.5l-2-.8-1.8 3.1 1.7 1.3a7.7 7.7 0 000 3l-1.7 1.3 1.8 3.1 2-.8a7.6 7.6 0 002.6 1.5l.3 2.4h3.6l.3-2.4a7.6 7.6 0 002.6-1.5l2 .8 1.8-3.1-1.7-1.3z" />
+    </svg>
+  );
+}
+
+export function NoteIcon(props: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" {...props}>
+      <path d="M19 3H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2V5a2 2 0 00-2-2zm-2 6H7V7h10v2zm0 4H7v-2h10v2zm-3 4H7v-2h7v2z" />
+    </svg>
+  );
+}
