@@ -49,6 +49,14 @@ class UpdateUserDto {
   @IsString()
   @Length(0, 500)
   bio?: string;
+
+  @IsOptional()
+  @IsString()
+  avatarUrl?: string | null;
+
+  @IsOptional()
+  @IsString()
+  bannerUrl?: string | null;
 }
 
 class SetStatusDto {

@@ -30,8 +30,10 @@ const navItems = [
 
 export function MainLayout() {
   const [moreOpen, setMoreOpen] = useState(false);
+  const [accountOpen, setAccountOpen] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const moreRef = useRef<HTMLLIElement>(null);
+  const accountRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
   const { accounts, active, logout, isAuthenticated } = useSession();
 
@@ -40,9 +42,15 @@ export function MainLayout() {
       if (moreRef.current && !moreRef.current.contains(e.target as Node)) {
         setMoreOpen(false);
       }
+      if (accountRef.current && !accountRef.current.contains(e.target as Node)) {
+        setAccountOpen(false);
+      }
     };
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setMoreOpen(false);
+      if (e.key === "Escape") {
+        setMoreOpen(false);
+        setAccountOpen(false);
+      }
     };
     document.addEventListener("mousedown", onDoc);
     document.addEventListener("keydown", onKey);
@@ -109,6 +117,16 @@ export function MainLayout() {
                       <SettingsIcon className="w-5 h-5" />
                       Settings
                     </Link>
+                    {active?.isAdmin ? (
+                      <Link
+                        role="menuitem"
+                        to="/admin/settings"
+                        className="flex items-center gap-3 px-4 py-3 hover:bg-[var(--color-bg-secondary)] text-[15px] font-bold"
+                        onClick={() => setMoreOpen(false)}
+                      >
+                        Admin Panel
+                      </Link>
+                    ) : null}
                     <Link
                       role="menuitem"
                       to="/settings/appearance"
@@ -215,24 +233,97 @@ export function MainLayout() {
               <ComposeIcon className="w-6 h-6 xl:hidden" />
             </Link>
 
-            {/* Active account chip */}
-            <div className="mt-auto mb-3 flex xl:justify-start justify-center">
+            {/* Active account chip — opens account switcher dropdown on desktop */}
+            <div className="mt-auto mb-3 flex xl:justify-start justify-center relative" ref={accountRef}>
               {active ? (
-                <button
-                  type="button"
-                  className="nav-item w-full max-w-full"
-                  onClick={() => setMoreOpen(true)}
-                  title="Switch account"
-                >
-                  <img
-                    src={active.avatarUrl || "/assets/default-avatar.svg"}
-                    alt=""
-                    className="w-[26.25px] h-[26.25px] rounded-full object-cover shrink-0"
-                  />
-                  <span className="hidden xl:inline pr-4 text-[15px] truncate">
-                    @{active.username}
-                  </span>
-                </button>
+                <>
+                  <button
+                    type="button"
+                    className="nav-item w-full max-w-full"
+                    onClick={() => setAccountOpen((o) => !o)}
+                    aria-haspopup="menu"
+                    aria-expanded={accountOpen}
+                    title="Account menu"
+                  >
+                    <img
+                      src={active.avatarUrl || "/assets/default-avatar.svg"}
+                      alt=""
+                      className="w-[26.25px] h-[26.25px] rounded-full object-cover shrink-0"
+                    />
+                    <span className="hidden xl:inline pr-4 text-[15px] truncate">
+                      @{active.username}
+                    </span>
+                  </button>
+                  {accountOpen ? (
+                    <div
+                      role="menu"
+                      className="absolute left-0 bottom-full mb-2 w-[280px] rounded-2xl border shadow-xl z-50 overflow-hidden"
+                      style={{
+                        background: "var(--color-bg)",
+                        borderColor: "var(--color-border)",
+                        boxShadow: "0 0 15px rgba(0,0,0,0.2)",
+                      }}
+                    >
+                      <div
+                        className="px-4 py-2 text-[12px] font-bold uppercase tracking-wide"
+                        style={{ color: "var(--color-text-secondary)" }}
+                      >
+                        Accounts
+                      </div>
+                      {accounts.map((a) => (
+                        <Link
+                          key={a.userId}
+                          to={
+                            active?.id === a.userId
+                              ? `/${a.username}`
+                              : `/login?u=${encodeURIComponent(a.username)}`
+                          }
+                          role="menuitem"
+                          className="flex items-center gap-3 w-full px-4 py-2.5 hover:bg-[var(--color-bg-secondary)] text-left"
+                          onClick={() => setAccountOpen(false)}
+                        >
+                          <img
+                            src={a.avatarUrl || "/assets/default-avatar.svg"}
+                            alt=""
+                            className="w-8 h-8 rounded-full object-cover"
+                          />
+                          <span className="flex-1 min-w-0">
+                            <span className="block font-bold text-[14px] truncate">{a.displayName}</span>
+                            <span
+                              className="block text-[12px] truncate"
+                              style={{ color: "var(--color-text-secondary)" }}
+                            >
+                              @{a.username}
+                              {active?.id === a.userId ? " · Active" : ""}
+                            </span>
+                          </span>
+                        </Link>
+                      ))}
+                      <div className="border-t" style={{ borderColor: "var(--color-border)" }}>
+                        <Link
+                          role="menuitem"
+                          to="/login"
+                          className="block px-4 py-3 hover:bg-[var(--color-bg-secondary)] text-[15px]"
+                          onClick={() => setAccountOpen(false)}
+                        >
+                          Add an existing account
+                        </Link>
+                        <button
+                          type="button"
+                          role="menuitem"
+                          className="w-full text-left px-4 py-3 hover:bg-[var(--color-bg-secondary)] text-[15px]"
+                          onClick={() => {
+                            logout();
+                            setAccountOpen(false);
+                            navigate("/login");
+                          }}
+                        >
+                          Log out @{active.username}
+                        </button>
+                      </div>
+                    </div>
+                  ) : null}
+                </>
               ) : (
                 <Link to="/login" className="nav-item">
                   <ProfileIcon className="w-[26.25px] h-[26.25px] shrink-0" />

@@ -17,7 +17,7 @@ type Props = {
     bio: string;
     avatarFile?: File | null;
     bannerFile?: File | null;
-  }) => void;
+  }) => void | Promise<void>;
 };
 
 /**
@@ -40,6 +40,7 @@ export function EditProfileModal({
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [bannerPreview, setBannerPreview] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
   const avatarInput = useRef<HTMLInputElement>(null);
   const bannerInput = useRef<HTMLInputElement>(null);
 
@@ -89,15 +90,21 @@ export function EditProfileModal({
     setBannerPreview(previewUrl(result.file));
   }
 
-  function submit(e: React.FormEvent) {
+  async function submit(e: React.FormEvent) {
     e.preventDefault();
-    onSave?.({
-      displayName: displayName.trim(),
-      bio: bio.trim(),
-      avatarFile,
-      bannerFile,
-    });
-    onClose();
+    if (saving) return;
+    setSaving(true);
+    try {
+      await onSave?.({
+        displayName: displayName.trim(),
+        bio: bio.trim(),
+        avatarFile,
+        bannerFile,
+      });
+      // Parent closes on success; keep open on error.
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
@@ -128,8 +135,8 @@ export function EditProfileModal({
           <h2 id="edit-profile-title" className="flex-1 text-[20px] font-extrabold">
             Edit profile
           </h2>
-          <button type="submit" className="btn btn-primary !py-1.5 !px-4 text-[14px]">
-            Save
+          <button type="submit" className="btn btn-primary !py-1.5 !px-4 text-[14px]" disabled={saving}>
+            {saving ? "Saving…" : "Save"}
           </button>
         </div>
 

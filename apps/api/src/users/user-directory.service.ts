@@ -46,6 +46,9 @@ export interface PresentedUser {
   status: AccountStatus;
   isSystem: boolean;
   loginDisabled: boolean;
+  isAdmin: boolean;
+  followingCount: number;
+  followersCount: number;
   createdAt: string;
 }
 
@@ -194,7 +197,7 @@ export class UserDirectoryService implements OnModuleInit {
     const type = effectiveVerification(user.verification, Boolean(user.affiliatedToId));
     const presentation = verificationPresentation(type);
 
-    const [parent, affiliateCount] = await Promise.all([
+    const [parent, affiliateCount, followingCount, followersCount] = await Promise.all([
       user.affiliatedToId
         ? (this.prisma.user.findUnique({
             where: { id: user.affiliatedToId },
@@ -202,6 +205,8 @@ export class UserDirectoryService implements OnModuleInit {
           }) as Promise<UserRow | null>)
         : Promise.resolve(null),
       this.prisma.user.count({ where: { affiliatedToId: user.id } }),
+      this.prisma.follow.count({ where: { followerId: user.id } }),
+      this.prisma.follow.count({ where: { followingId: user.id } }),
     ]);
 
     return {
@@ -227,8 +232,23 @@ export class UserDirectoryService implements OnModuleInit {
       status: user.status === "SUSPENDED" ? "SUSPENDED" : "ACTIVE",
       isSystem: user.isSystem,
       loginDisabled: user.loginDisabled,
+      isAdmin: await this.userIsAdmin(user.id),
+      followingCount,
+      followersCount,
       createdAt: user.createdAt.toISOString(),
     };
+  }
+
+  /** True when the account holds an administrator or owner role. */
+  private async userIsAdmin(userId: string): Promise<boolean> {
+    const row = await this.prisma.userRole.findFirst({
+      where: {
+        userId,
+        role: { name: { in: ["administrator", "owner", "admin"] } },
+      },
+      select: { userId: true },
+    });
+    return Boolean(row);
   }
 
   async list(): Promise<PresentedUser[]> {

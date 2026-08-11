@@ -1,23 +1,27 @@
 import { useState } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeftIcon, MoreIcon } from "../icons";
 import { api, ApiError } from "../api";
 import { Avatar, NameWithBadges, VerifiedBadge } from "../components/Verification";
 import { PostCard } from "../components/PostCard";
 import { EditProfileModal } from "../components/EditProfileModal";
+import { PageLoader } from "../components/LoadingSpinner";
 import { useSession } from "../hooks/useSession";
 
 export function ProfilePage() {
   const { username } = useParams();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { active } = useSession();
   const handle = username ?? active?.username ?? "";
   const [editOpen, setEditOpen] = useState(false);
   const [localAvatar, setLocalAvatar] = useState<string | null>(null);
   const [localBanner, setLocalBanner] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
 
-  const { data, isLoading, error } = useQuery({
+  const { data, isLoading, error, refetch } = useQuery({
     queryKey: ["user", handle],
     queryFn: () => api.getUser(handle),
     retry: false,
@@ -33,7 +37,7 @@ export function ProfilePage() {
       (user && active?.username === user.username) ||
       active?.username === handle);
 
-  const { data: postData } = useQuery({
+  const { data: postData, isLoading: postsLoading } = useQuery({
     queryKey: ["posts", handle],
     queryFn: () => api.listPosts(handle),
     enabled: Boolean(handle) && !notFound,
@@ -41,8 +45,15 @@ export function ProfilePage() {
   });
   const posts = postData?.posts ?? [];
 
+  const bannerSrc = localBanner || user?.bannerUrl || null;
+  const avatarSrc =
+    localAvatar || user?.avatarUrl || active?.avatarUrl || "/assets/default-avatar.svg";
+
+  const following = user?.followingCount ?? 0;
+  const followers = user?.followersCount ?? 0;
+
   return (
-    <div>
+    <div className="animate-fade-in">
       <header className="x-header gap-6">
         <button type="button" onClick={() => navigate(-1)} className="icon-btn -ml-2" aria-label="Back">
           <ArrowLeftIcon className="w-5 h-5" />
@@ -55,15 +66,15 @@ export function ProfilePage() {
         </div>
       </header>
 
-      <div className="relative h-[200px]" style={{ background: "var(--color-bg-secondary)" }}>
-        {localBanner ? (
-          <img src={localBanner} alt="" className="absolute inset-0 w-full h-full object-cover" />
+      <div className="relative h-[200px] z-0" style={{ background: "var(--color-bg-secondary)" }}>
+        {bannerSrc ? (
+          <img src={bannerSrc} alt="" className="absolute inset-0 w-full h-full object-cover" />
         ) : null}
       </div>
 
-      <div className="px-4 pb-3">
+      <div className="px-4 pb-3 relative z-[1]">
         <div className="flex justify-between items-start">
-          <div className="-mt-[66px]">
+          <div className="profile-avatar-overlap -mt-[66px]">
             {localAvatar ? (
               <img
                 src={localAvatar}
@@ -77,12 +88,7 @@ export function ProfilePage() {
                 }}
               />
             ) : (
-              <Avatar
-                shape={user?.avatarShape ?? "circle"}
-                size={133}
-                ring
-                src={user?.avatarUrl || "/assets/default-avatar.svg"}
-              />
+              <Avatar shape={user?.avatarShape ?? "circle"} size={133} ring src={avatarSrc} />
             )}
           </div>
           <div className="flex items-center gap-2 pt-3">
@@ -107,9 +113,7 @@ export function ProfilePage() {
         </div>
 
         {isLoading ? (
-          <p className="mt-4 text-[15px]" style={{ color: "var(--color-text-secondary)" }}>
-            Loading profile…
-          </p>
+          <PageLoader label="Loading profile…" />
         ) : notFound && !isOwnProfile ? (
           <div className="mt-4">
             <h2 className="text-[20px] font-extrabold">This account doesn&apos;t exist</h2>
@@ -186,10 +190,10 @@ export function ProfilePage() {
 
             <div className="flex gap-5 mt-3 text-[14px]" style={{ color: "var(--color-text-secondary)" }}>
               <span>
-                <strong style={{ color: "var(--color-text)" }}>—</strong> Following
+                <strong style={{ color: "var(--color-text)" }}>{following}</strong> Following
               </span>
               <span>
-                <strong style={{ color: "var(--color-text)" }}>—</strong> Followers
+                <strong style={{ color: "var(--color-text)" }}>{followers}</strong> Followers
               </span>
             </div>
           </>
@@ -204,8 +208,10 @@ export function ProfilePage() {
         ))}
       </div>
 
-      {posts.length > 0 ? (
-        <ul>
+      {postsLoading ? (
+        <PageLoader label="Loading posts…" />
+      ) : posts.length > 0 ? (
+        <ul className="animate-fade-in">
           {posts.map((post) => (
             <li key={post.id}>
               <PostCard post={post} />
@@ -221,23 +227,49 @@ export function ProfilePage() {
 
       <EditProfileModal
         open={editOpen}
-        onClose={() => setEditOpen(false)}
+        onClose={() => {
+          if (!saving) setEditOpen(false);
+        }}
         displayName={user?.displayName ?? active?.displayName ?? ""}
-        bio={user?.bio}
-        avatarUrl={localAvatar || active?.avatarUrl}
-        bannerUrl={localBanner}
-        onSave={({ avatarFile, bannerFile }) => {
-          // Preview locally until media upload API is connected.
-          if (avatarFile) {
-            if (localAvatar) URL.revokeObjectURL(localAvatar);
-            setLocalAvatar(URL.createObjectURL(avatarFile));
-          }
-          if (bannerFile) {
-            if (localBanner) URL.revokeObjectURL(localBanner);
-            setLocalBanner(URL.createObjectURL(bannerFile));
+        bio={user?.bio ?? ""}
+        avatarUrl={avatarSrc}
+        bannerUrl={bannerSrc}
+        onSave={async ({ displayName, bio, avatarFile, bannerFile }) => {
+          if (!active?.username) return;
+          setSaveError(null);
+          setSaving(true);
+          try {
+            if (avatarFile) {
+              if (localAvatar) URL.revokeObjectURL(localAvatar);
+              setLocalAvatar(URL.createObjectURL(avatarFile));
+            }
+            if (bannerFile) {
+              if (localBanner) URL.revokeObjectURL(localBanner);
+              setLocalBanner(URL.createObjectURL(bannerFile));
+            }
+
+            await api.updateUser(active.username, {
+              displayName: displayName || undefined,
+              bio: bio ?? "",
+            });
+            await queryClient.invalidateQueries({ queryKey: ["user", handle] });
+            await queryClient.invalidateQueries({ queryKey: ["session"] });
+            await refetch();
+            setEditOpen(false);
+          } catch (err) {
+            const message =
+              err instanceof ApiError ? err.message : "Could not save profile. Try again.";
+            setSaveError(message);
+          } finally {
+            setSaving(false);
           }
         }}
       />
+      {saveError ? (
+        <p className="px-4 py-2 text-[14px] text-red-500" role="alert">
+          {saveError}
+        </p>
+      ) : null}
     </div>
   );
 }

@@ -156,7 +156,7 @@ export function MobileDrawer({ open, onClose }: { open: boolean; onClose: () => 
         style={{ background: "var(--color-bg)" }}
       >
         <div className="px-4 pt-4 pb-3 border-b" style={{ borderColor: "var(--color-border)" }}>
-          <div className="flex items-start justify-between">
+          <div className="flex items-start justify-between gap-2">
             {active ? (
               <Link to={`/${active.username}`}>
                 <Avatar shape={active.avatarShape} size={40} src={active.avatarUrl ?? undefined} />
@@ -164,18 +164,33 @@ export function MobileDrawer({ open, onClose }: { open: boolean; onClose: () => 
             ) : (
               <img src="/assets/logo.svg" alt="" className="w-9 h-9" />
             )}
-            <button
-              ref={closeButton}
-              type="button"
-              onClick={onClose}
-              className="icon-btn"
-              style={{ width: 44, height: 44 }}
-              aria-label="Close menu"
-            >
-              <span aria-hidden="true" className="text-[22px] leading-none">
-                ×
-              </span>
-            </button>
+            <div className="flex items-center gap-1">
+              {isAuthenticated ? (
+                <Link
+                  to="/settings/account"
+                  className="icon-btn"
+                  style={{ width: 44, height: 44 }}
+                  aria-label="Switch account"
+                  title="Switch account"
+                >
+                  <span aria-hidden="true" className="text-[18px] leading-none font-bold">
+                    ⇄
+                  </span>
+                </Link>
+              ) : null}
+              <button
+                ref={closeButton}
+                type="button"
+                onClick={onClose}
+                className="icon-btn"
+                style={{ width: 44, height: 44 }}
+                aria-label="Close menu"
+              >
+                <span aria-hidden="true" className="text-[22px] leading-none">
+                  ×
+                </span>
+              </button>
+            </div>
           </div>
 
           {active ? (
@@ -191,8 +206,8 @@ export function MobileDrawer({ open, onClose }: { open: boolean; onClose: () => 
                 @{active.username}
               </p>
               <p className="mt-2 text-[14px]" style={{ color: "var(--color-text-secondary)" }}>
-                <strong style={{ color: "var(--color-text)" }}>—</strong> Following{" "}
-                <strong style={{ color: "var(--color-text)" }}>—</strong> Followers
+                <strong style={{ color: "var(--color-text)" }}>{active.followingCount ?? 0}</strong> Following{" "}
+                <strong style={{ color: "var(--color-text)" }}>{active.followersCount ?? 0}</strong> Followers
               </p>
             </div>
           ) : (
@@ -233,6 +248,15 @@ export function MobileDrawer({ open, onClose }: { open: boolean; onClose: () => 
             <SettingsGearIcon className="w-[24px] h-[24px] shrink-0" />
             Settings and privacy
           </Link>
+          {active?.isAdmin ? (
+            <Link
+              to="/admin/settings"
+              className="flex items-center gap-5 px-4 text-[17px] font-bold"
+              style={{ minHeight: 52 }}
+            >
+              Admin Panel
+            </Link>
+          ) : null}
 
           {accounts.length > 0 ? (
             <div className="mt-2 pt-2 border-t" style={{ borderColor: "var(--color-border)" }}>
@@ -309,52 +333,129 @@ export function MobileDrawer({ open, onClose }: { open: boolean; onClose: () => 
  */
 export function MobileBottomNav() {
   return (
-    <>
-      <nav
-        className="md:hidden fixed bottom-0 inset-x-0 flex justify-around items-stretch border-t z-40"
-        style={{
-          borderColor: "var(--color-border)",
-          background: "var(--color-bg)",
-          paddingBottom: "env(safe-area-inset-bottom)",
-        }}
-        aria-label="Primary"
+    <nav
+      className="md:hidden fixed bottom-0 inset-x-0 flex justify-around items-stretch border-t z-40"
+      style={{
+        borderColor: "var(--color-border)",
+        background: "var(--color-bg)",
+        paddingBottom: "env(safe-area-inset-bottom)",
+      }}
+      aria-label="Primary"
+    >
+      <NavLink
+        to="/home"
+        className="flex flex-col items-center justify-center flex-1 relative"
+        style={({ isActive }) => ({
+          minHeight: 53,
+          minWidth: 44,
+          color: isActive ? "var(--color-text)" : "var(--color-text-secondary)",
+        })}
+        aria-label="Home"
       >
-        {bottomItems.map(({ to, label, icon: Icon }) => (
-          <NavLink
-            key={to}
-            to={to}
-            className="flex flex-col items-center justify-center flex-1 relative"
-            style={({ isActive }) => ({
-              minHeight: 53,
-              minWidth: 44,
-              color: isActive ? "var(--color-text)" : "var(--color-text-secondary)",
-            })}
-            aria-label={label}
-          >
-            {({ isActive }) => (
-              <>
-                <Icon className="w-[26px] h-[26px]" />
-                {isActive ? (
-                  <span
-                    aria-hidden="true"
-                    className="absolute top-0 h-[3px] w-8 rounded-full"
-                    style={{ background: "var(--color-primary)" }}
-                  />
-                ) : null}
-              </>
-            )}
-          </NavLink>
-        ))}
-      </nav>
+        {({ isActive }) => (
+          <>
+            <HomeIcon className="w-[26px] h-[26px]" />
+            {isActive ? (
+              <span
+                aria-hidden="true"
+                className="absolute top-0 h-[3px] w-8 rounded-full"
+                style={{ background: "var(--color-primary)" }}
+              />
+            ) : null}
+          </>
+        )}
+      </NavLink>
+
+      <NavLink
+        to="/explore"
+        className="flex flex-col items-center justify-center flex-1 relative"
+        style={({ isActive }) => ({
+          minHeight: 53,
+          minWidth: 44,
+          color: isActive ? "var(--color-text)" : "var(--color-text-secondary)",
+        })}
+        aria-label="Search"
+      >
+        {({ isActive }) => (
+          <>
+            <ExploreIcon className="w-[26px] h-[26px]" />
+            {isActive ? (
+              <span
+                aria-hidden="true"
+                className="absolute top-0 h-[3px] w-8 rounded-full"
+                style={{ background: "var(--color-primary)" }}
+              />
+            ) : null}
+          </>
+        )}
+      </NavLink>
 
       <Link
         to="/home#composer"
-        className="md:hidden fixed right-4 w-14 h-14 rounded-full btn btn-primary shadow-lg z-40"
-        style={{ bottom: "calc(69px + env(safe-area-inset-bottom))" }}
-        aria-label="Write a post"
+        className="flex flex-col items-center justify-center flex-1 relative"
+        style={{ minHeight: 53, minWidth: 44 }}
+        aria-label="Post"
       >
-        <ComposeIcon className="w-6 h-6" />
+        <span
+          className="flex items-center justify-center rounded-full"
+          style={{
+            width: 40,
+            height: 40,
+            background: "var(--color-btn)",
+            color: "var(--color-btn-text)",
+          }}
+        >
+          <ComposeIcon className="w-5 h-5" />
+        </span>
       </Link>
-    </>
+
+      <NavLink
+        to="/notifications"
+        className="flex flex-col items-center justify-center flex-1 relative"
+        style={({ isActive }) => ({
+          minHeight: 53,
+          minWidth: 44,
+          color: isActive ? "var(--color-text)" : "var(--color-text-secondary)",
+        })}
+        aria-label="Notifications"
+      >
+        {({ isActive }) => (
+          <>
+            <NotificationsIcon className="w-[26px] h-[26px]" />
+            {isActive ? (
+              <span
+                aria-hidden="true"
+                className="absolute top-0 h-[3px] w-8 rounded-full"
+                style={{ background: "var(--color-primary)" }}
+              />
+            ) : null}
+          </>
+        )}
+      </NavLink>
+
+      <NavLink
+        to="/messages"
+        className="flex flex-col items-center justify-center flex-1 relative"
+        style={({ isActive }) => ({
+          minHeight: 53,
+          minWidth: 44,
+          color: isActive ? "var(--color-text)" : "var(--color-text-secondary)",
+        })}
+        aria-label="Messages"
+      >
+        {({ isActive }) => (
+          <>
+            <MessagesIcon className="w-[26px] h-[26px]" />
+            {isActive ? (
+              <span
+                aria-hidden="true"
+                className="absolute top-0 h-[3px] w-8 rounded-full"
+                style={{ background: "var(--color-primary)" }}
+              />
+            ) : null}
+          </>
+        )}
+      </NavLink>
+    </nav>
   );
 }

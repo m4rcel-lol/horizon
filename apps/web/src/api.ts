@@ -64,6 +64,10 @@ export interface ApiUser {
   status: "ACTIVE" | "SUSPENDED";
   isSystem: boolean;
   loginDisabled: boolean;
+  isAdmin?: boolean;
+  bannerUrl?: string | null;
+  followingCount?: number;
+  followersCount?: number;
   createdAt: string;
 }
 
@@ -115,6 +119,14 @@ export const api = {
   getUser: (username: string) => request<{ user: ApiUser }>(`/users/${encodeURIComponent(username)}`),
   createUser: (body: { username: string; displayName: string; bio?: string; verification?: VerificationType }) =>
     request<{ user: ApiUser }>("/users", { method: "POST", body: JSON.stringify(body) }),
+  updateUser: (
+    username: string,
+    body: { displayName?: string; bio?: string; avatarUrl?: string | null; bannerUrl?: string | null },
+  ) =>
+    request<{ user: ApiUser }>(`/users/${encodeURIComponent(username)}`, {
+      method: "PATCH",
+      body: JSON.stringify(body),
+    }),
   setVerification: (username: string, type: VerificationType, reason?: string) =>
     request<{ user: ApiUser; releasedAffiliates: number }>(
       `/users/${encodeURIComponent(username)}/verification`,

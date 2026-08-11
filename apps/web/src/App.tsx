@@ -1,6 +1,7 @@
 import { Routes, Route, Navigate } from "react-router-dom";
 import { MainLayout } from "./layouts/MainLayout";
 import { useSession } from "./hooks/useSession";
+import { PageLoader } from "./components/LoadingSpinner";
 import { LandingPage } from "./pages/LandingPage";
 import { HomePage } from "./pages/HomePage";
 import { ExplorePage } from "./pages/ExplorePage";
@@ -31,15 +32,11 @@ import {
 
 /**
  * The root is the landing page for visitors, and the timeline for members.
- *
- * The landing page renders standalone rather than inside the app shell — a
- * signed-out visitor should not be looking at a navigation rail for an account
- * they do not have. Waiting for the session to resolve avoids flashing the
- * marketing page at someone who is already signed in.
+ * Docs / legal pages render standalone (no app chrome).
  */
 function RootRoute() {
   const { active, loading } = useSession();
-  if (loading) return null;
+  if (loading) return <PageLoader label="Loading…" />;
   return active ? <Navigate to="/home" replace /> : <LandingPage />;
 }
 
@@ -51,6 +48,15 @@ export default function App() {
       <Route path="/setup" element={<SetupPage />} />
       <Route path="/admin/settings" element={<AdminSettingsPage />} />
       <Route path="/admin/verification" element={<AdminVerificationPage />} />
+
+      {/* Standalone legal / documentation pages — no main nav chrome */}
+      <Route path="/about" element={<AboutPage />} />
+      <Route path="/privacy" element={<PrivacyPage />} />
+      <Route path="/terms" element={<TermsPage />} />
+      <Route path="/docs" element={<DocsPage />}>
+        <Route index element={<DocsIndex />} />
+        <Route path=":slug" element={<DocArticle />} />
+      </Route>
 
       <Route path="/" element={<RootRoute />} />
 
@@ -64,13 +70,6 @@ export default function App() {
         <Route path="/lists" element={<ListsPage />} />
         <Route path="/communities" element={<CommunitiesPage />} />
         <Route path="/profile" element={<ProfilePage />} />
-        <Route path="/about" element={<AboutPage />} />
-        <Route path="/privacy" element={<PrivacyPage />} />
-        <Route path="/terms" element={<TermsPage />} />
-        <Route path="/docs" element={<DocsPage />}>
-          <Route index element={<DocsIndex />} />
-          <Route path=":slug" element={<DocArticle />} />
-        </Route>
         <Route path="/settings" element={<SettingsPage />}>
           <Route path="appearance" element={<SettingsAppearancePage />} />
           <Route path="account" element={<SettingsAccountPage />} />
