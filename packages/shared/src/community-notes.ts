@@ -80,4 +80,6 @@ export const COMMUNITY_NOTES_ACCOUNT = {
   username: "CommunityNotes",
   displayName: "Community Notes",
   bio: "Readers add context to posts on this instance. Notes are written and rated by people here, never by an algorithm.",
+  /** Default profile picture for the system Community Notes account. */
+  avatarUrl: "/assets/community-notes-avatar.jpg",
 } as const;

@@ -83,7 +83,11 @@ export function PostCard({
       <article className="px-4 py-3 border-b" style={{ borderColor: "var(--color-border)" }}>
         <div className="flex gap-3">
           <Link to={`/${handle}`}>
-            <Avatar shape={author?.avatarShape ?? "circle"} size={48} />
+            <Avatar
+              shape={author?.avatarShape ?? "circle"}
+              size={48}
+              src={author?.avatarUrl || "/assets/default-avatar.svg"}
+            />
           </Link>
           <div className="min-w-0">
             <Link to={`/${handle}`} className="font-bold leading-5 hover:underline">
@@ -108,7 +112,11 @@ export function PostCard({
       style={{ borderColor: "var(--color-border)" }}
     >
       <Link to={`/${handle}`} className="shrink-0">
-        <Avatar shape={author?.avatarShape ?? "circle"} size={40} />
+        <Avatar
+          shape={author?.avatarShape ?? "circle"}
+          size={40}
+          src={author?.avatarUrl || "/assets/default-avatar.svg"}
+        />
       </Link>
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-1 text-[15px] min-w-0">

@@ -48,6 +48,8 @@ export interface ApiUser {
   username: string;
   displayName: string;
   bio?: string;
+  /** Public avatar URL; falls back to default when null. */
+  avatarUrl?: string | null;
   /** Tier granted directly, before affiliation is taken into account. */
   verification: VerificationType;
   /** Badge actually displayed. */

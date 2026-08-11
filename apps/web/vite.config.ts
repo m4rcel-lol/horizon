@@ -19,7 +19,16 @@ function rootAssetsPlugin(): Plugin {
         const name = path.basename(decodeURIComponent((req.url ?? "").split("?")[0]));
         const file = path.join(rootAssets, name);
         if (!name || !file.startsWith(rootAssets) || !fs.existsSync(file)) return next();
-        res.setHeader("Content-Type", name.endsWith(".svg") ? "image/svg+xml" : "application/octet-stream");
+        const ext = path.extname(name).toLowerCase();
+        const types: Record<string, string> = {
+          ".svg": "image/svg+xml",
+          ".png": "image/png",
+          ".jpg": "image/jpeg",
+          ".jpeg": "image/jpeg",
+          ".webp": "image/webp",
+          ".gif": "image/gif",
+        };
+        res.setHeader("Content-Type", types[ext] || "application/octet-stream");
         fs.createReadStream(file).pipe(res);
       });
     },

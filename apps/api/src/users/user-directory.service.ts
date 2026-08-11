@@ -16,6 +16,8 @@ export interface DirectoryUser {
   username: string;
   displayName: string;
   bio?: string;
+  /** Public avatar URL; system accounts may ship a fixed asset path. */
+  avatarUrl?: string | null;
   /** Tier granted by an administrator, before any affiliation is applied. */
   verification: VerificationType;
   affiliatedToId: string | null;
@@ -94,12 +96,18 @@ export class UserDirectoryService implements OnModuleInit {
    * can quietly repurpose or silence it.
    */
   private seedSystemAccounts() {
-    if (this.byUsername(COMMUNITY_NOTES_ACCOUNT.username)) return;
+    const existing = this.byUsername(COMMUNITY_NOTES_ACCOUNT.username);
+    if (existing) {
+      // Keep the Community Notes avatar in sync with the packaged asset.
+      existing.avatarUrl = COMMUNITY_NOTES_ACCOUNT.avatarUrl;
+      return;
+    }
     const user: DirectoryUser = {
       id: "usr_system_communitynotes",
       username: COMMUNITY_NOTES_ACCOUNT.username,
       displayName: COMMUNITY_NOTES_ACCOUNT.displayName,
       bio: COMMUNITY_NOTES_ACCOUNT.bio,
+      avatarUrl: COMMUNITY_NOTES_ACCOUNT.avatarUrl,
       verification: "BUSINESS",
       affiliatedToId: null,
       affiliatedAt: null,
@@ -175,6 +183,7 @@ export class UserDirectoryService implements OnModuleInit {
       username: user.username,
       displayName: user.displayName,
       bio: user.bio,
+      avatarUrl: user.avatarUrl ?? null,
       verification: user.verification,
       effectiveVerification: type,
       badge: presentation.badge,

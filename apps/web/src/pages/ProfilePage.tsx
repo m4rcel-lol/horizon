@@ -77,7 +77,12 @@ export function ProfilePage() {
                 }}
               />
             ) : (
-              <Avatar shape={user?.avatarShape ?? "circle"} size={133} ring />
+              <Avatar
+                shape={user?.avatarShape ?? "circle"}
+                size={133}
+                ring
+                src={user?.avatarUrl || "/assets/default-avatar.svg"}
+              />
             )}
           </div>
           <div className="flex items-center gap-2 pt-3">
