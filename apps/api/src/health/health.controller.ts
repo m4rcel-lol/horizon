@@ -1,6 +1,9 @@
 import { Controller, Get } from "@nestjs/common";
 import { SOFTWARE_NAME, SOFTWARE_VERSION } from "@horizon/shared";
+import { Public } from "../auth/auth.decorators";
 
+// Compose's healthcheck has no cookie to send, so these must stay open.
+@Public()
 @Controller("health")
 export class HealthController {
   // Two @Get decorators on one method do not register two routes — the outer

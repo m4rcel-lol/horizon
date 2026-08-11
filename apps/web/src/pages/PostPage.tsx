@@ -18,7 +18,7 @@ export function PostPage() {
 
   const rate = useMutation({
     mutationFn: ({ id, helpful }: { id: string; helpful: boolean }) =>
-      api.rateNote(id, helpful, `reader-${Math.random().toString(36).slice(2, 8)}`),
+      api.rateNote(id, helpful),
     onSuccess: () => queryClient.invalidateQueries(),
   });
 

@@ -2,6 +2,7 @@ import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
 import { ArrowLeftIcon } from "../icons";
 import { useTheme } from "../theme";
 import { useSession } from "../hooks/useSession";
+import { PERMISSIONS } from "@horizon/shared";
 
 const sections = [
   { to: "/settings/appearance", label: "Appearance", description: "Theme and display" },
@@ -9,9 +10,27 @@ const sections = [
   { to: "/settings/privacy", label: "Privacy", description: "Visibility and interactions" },
 ];
 
+/** Shown only to accounts that hold the matching permission. */
+const adminSections = [
+  {
+    to: "/admin/settings",
+    label: "Instance settings",
+    description: "Storage, email and branding for this instance",
+    permission: PERMISSIONS.SETTINGS_VIEW,
+  },
+  {
+    to: "/admin/verification",
+    label: "Verification and affiliation",
+    description: "Grant badges and manage organisations",
+    permission: PERMISSIONS.VERIFICATION_GRANT,
+  },
+];
+
 export function SettingsPage() {
   const location = useLocation();
+  const { can } = useSession();
   const isIndex = location.pathname === "/settings" || location.pathname === "/settings/";
+  const visibleAdminSections = adminSections.filter((s) => can(s.permission));
 
   return (
     <div>
@@ -36,6 +55,29 @@ export function SettingsPage() {
               </span>
             </NavLink>
           ))}
+
+          {visibleAdminSections.length > 0 ? (
+            <>
+              <p
+                className="px-4 pt-5 pb-2 text-[12px] font-bold uppercase tracking-wide"
+                style={{ color: "var(--color-text-secondary)" }}
+              >
+                Administration
+              </p>
+              {visibleAdminSections.map((s) => (
+                <NavLink
+                  key={s.to}
+                  to={s.to}
+                  className="flex flex-col px-4 py-4 hover:bg-[var(--color-bg-secondary)] transition-colors"
+                >
+                  <span className="font-bold text-[15px]">{s.label}</span>
+                  <span className="text-[13px]" style={{ color: "var(--color-text-secondary)" }}>
+                    {s.description}
+                  </span>
+                </NavLink>
+              ))}
+            </>
+          ) : null}
         </nav>
       ) : (
         <Outlet />

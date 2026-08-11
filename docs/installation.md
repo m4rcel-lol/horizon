@@ -148,10 +148,10 @@ It is idempotent: running it again resets that account's password and re-grants
 the role, which is also how you recover from being locked out. It creates the
 `administrator` role with every permission key and assigns it.
 
-**Authorization is not enforced yet.** The `/admin` pages are currently reachable
-by anyone who knows the URL, so this role is recorded for when checks land rather
-than being a security boundary today. Do not treat an unauthenticated instance as
-private.
+This role holds every permission in `PERMISSIONS`. The administration pages
+appear under Settings for accounts that hold them, and every route behind them is
+checked server-side — see [`authorization.md`](authorization.md) for the full map
+of what each route requires.
 
 ## Rebuilding
 

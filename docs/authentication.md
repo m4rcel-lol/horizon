@@ -58,9 +58,9 @@ credential and are refused at sign-in explicitly rather than relying on that.
 
 ## Still to do
 
-- **Authorization is not enforced on other routes.** Verification, affiliation
-  and posting still accept the actor from the request body rather than the
-  session. Signing in works; permission checks are the next piece.
+- Roles beyond `administrator`. Permission checks are enforced — see
+  [`authorization.md`](authorization.md) — but the only role that ships is the
+  one the CLI creates, and there is no UI for managing others.
 - Multiple accounts signed in at once — designed in
   [the sessions proposal](sessions.md); switching currently asks for the other
   account's password.

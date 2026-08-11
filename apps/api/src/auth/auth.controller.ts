@@ -4,6 +4,8 @@ import { IsBoolean, IsEmail, IsOptional, IsString, Length, Matches, MinLength } 
 import { AuthService, SESSION_COOKIE, SESSION_IDLE_DAYS } from "./auth.service";
 import { UserDirectoryService } from "../users/user-directory.service";
 import { DirectoryError } from "../users/directory-error";
+import { CurrentUser, Public } from "./auth.decorators";
+import type { AuthenticatedUser } from "./authenticated-user";
 
 class RegisterDto {
   @IsString()
@@ -80,6 +82,7 @@ export class AuthController {
     };
   }
 
+  @Public()
   @Post("register")
   async register(@Body() body: RegisterDto, @Req() req: Request, @Res({ passthrough: true }) res: Response) {
     return this.unwrap(async () => {
@@ -90,6 +93,7 @@ export class AuthController {
     });
   }
 
+  @Public()
   @Post("login")
   async login(@Body() body: LoginDto, @Req() req: Request, @Res({ passthrough: true }) res: Response) {
     return this.unwrap(async () => {
@@ -100,6 +104,8 @@ export class AuthController {
     });
   }
 
+  // Signing out while already signed out is not an error worth a 401.
+  @Public()
   @Post("logout")
   async logout(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
     await this.auth.revokeSession(req.cookies?.[SESSION_COOKIE]);
@@ -107,30 +113,32 @@ export class AuthController {
     return { ok: true };
   }
 
-  /** Who the caller is, or null. The client uses this to decide what to render. */
+  /**
+   * Who the caller is, or null. The client uses this to decide what to render,
+   * so being signed out is an answer rather than a failure — hence @Public.
+   * `permissions` lets the client hide admin surfaces it would be refused.
+   */
+  @Public()
   @Get("me")
-  async me(@Req() req: Request) {
-    const session = await this.auth.resolveSession(req.cookies?.[SESSION_COOKIE]);
-    if (!session) return { user: null };
-    const user = await this.directory.tryGet(session.user.username);
-    return { user };
+  async me(@CurrentUser() auth: AuthenticatedUser | null) {
+    if (!auth) return { user: null, permissions: [] };
+    return {
+      user: await this.directory.tryGet(auth.username),
+      permissions: [...auth.permissions],
+    };
   }
 
   @Get("sessions")
-  async sessions(@Req() req: Request) {
-    const session = await this.auth.resolveSession(req.cookies?.[SESSION_COOKIE]);
-    if (!session) throw new HttpException({ error: { code: "NOT_SIGNED_IN", message: "Sign in first." } }, 401);
+  async sessions(@CurrentUser() auth: AuthenticatedUser) {
     return {
-      current: session.sessionId,
-      sessions: await this.auth.listSessions(session.user.id),
+      current: auth.sessionId,
+      sessions: await this.auth.listSessions(auth.id),
     };
   }
 
   @Post("sessions/revoke-others")
-  async revokeOthers(@Req() req: Request) {
-    const session = await this.auth.resolveSession(req.cookies?.[SESSION_COOKIE]);
-    if (!session) throw new HttpException({ error: { code: "NOT_SIGNED_IN", message: "Sign in first." } }, 401);
-    const revoked = await this.auth.revokeOtherSessions(session.user.id, session.sessionId);
+  async revokeOthers(@CurrentUser() auth: AuthenticatedUser) {
+    const revoked = await this.auth.revokeOtherSessions(auth.id, auth.sessionId);
     return { revoked };
   }
 }

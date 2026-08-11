@@ -8,6 +8,7 @@ import {
   saveAccount,
 } from "../lib/sessions";
 import { api, type ApiUser } from "../api";
+import type { PermissionKey } from "@horizon/shared";
 
 /**
  * Session state.
@@ -29,6 +30,20 @@ export function useSession() {
   });
 
   const active: ApiUser | null = data?.user ?? null;
+
+  /**
+   * What the server will let this account do.
+   *
+   * Only ever used to decide what to render. Every one of these is enforced
+   * again server-side, so hiding a control is a courtesy rather than the
+   * protection itself — a hand-typed URL still gets a 403.
+   */
+  const permissions = new Set<string>(data?.permissions ?? []);
+  const can = useCallback(
+    (permission: PermissionKey) => permissions.has(permission),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [data?.permissions],
+  );
 
   /** Remember this account on this device so the switcher can offer it. */
   const remember = useCallback((user: ApiUser) => {
@@ -62,6 +77,8 @@ export function useSession() {
       remember(user);
       queryClient.setQueryData(["session"], { user });
       queryClient.invalidateQueries();
+      // Permissions arrive with /auth/me, which login does not return.
+      refetch();
     },
   });
 
@@ -104,6 +121,9 @@ export function useSession() {
     /** The account the server says you are, or null. */
     active,
     isAuthenticated: Boolean(active),
+    /** Permission keys held by that account, for hiding what it cannot use. */
+    permissions,
+    can,
     loading: isLoading,
     signIn: async (identifier: string, password: string, remember = true) =>
       (await signIn.mutateAsync({ identifier, password, remember })).user,

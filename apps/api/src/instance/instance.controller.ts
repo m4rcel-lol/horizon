@@ -1,17 +1,11 @@
-import {
-  Body,
-  Controller,
-  Get,
-  Patch,
-  Post,
-  UnauthorizedException,
-  // UseGuards, // enable when AuthGuard exists
-} from "@nestjs/common";
+import { Body, Controller, Get, Patch, Post } from "@nestjs/common";
 import { InstanceSettingsService } from "./instance-settings.service";
 import {
   STORAGE_SETTING_FIELDS,
   EMAIL_SETTING_FIELDS,
 } from "@horizon/config";
+import { PERMISSIONS } from "@horizon/shared";
+import { Public, RequirePermissions } from "../auth/auth.decorators";
 
 /**
  * Instance & admin settings API.
@@ -22,21 +16,22 @@ import {
  * POST /api/instance/settings/test-email — admin: send test email
  * POST /api/instance/settings/test-storage — admin: verify storage connectivity
  *
- * Authorization: replace placeholder with real RBAC (settings.edit / system.manage).
+ * Only the public info route is open. Everything else needs settings.view or
+ * settings.edit, enforced by PermissionsGuard.
  */
 @Controller("instance")
 export class InstanceController {
   constructor(private readonly settings: InstanceSettingsService) {}
 
+  @Public()
   @Get()
   getPublic() {
     return this.settings.getPublicInfo();
   }
 
+  @RequirePermissions(PERMISSIONS.SETTINGS_VIEW)
   @Get("settings")
   getSettings() {
-    // TODO: require permission settings.view
-    this.assertAdmin();
     return {
       settings: this.settings.getAll(false),
       fields: {
@@ -50,10 +45,9 @@ export class InstanceController {
     };
   }
 
+  @RequirePermissions(PERMISSIONS.SETTINGS_EDIT)
   @Patch("settings")
   async updateSettings(@Body() body: Record<string, unknown>) {
-    // TODO: require permission settings.edit
-    this.assertAdmin();
     if (!body || typeof body !== "object") {
       return { error: { code: "INVALID_BODY", message: "Expected settings object" } };
     }
@@ -73,9 +67,9 @@ export class InstanceController {
     };
   }
 
+  @RequirePermissions(PERMISSIONS.SETTINGS_EDIT)
   @Post("settings/test-email")
   async testEmail(@Body() body: { to?: string }) {
-    this.assertAdmin();
     const email = this.settings.getEmailConfig();
     if (!email.configured) {
       return {
@@ -94,9 +88,9 @@ export class InstanceController {
     };
   }
 
+  @RequirePermissions(PERMISSIONS.SETTINGS_EDIT)
   @Post("settings/test-storage")
   async testStorage() {
-    this.assertAdmin();
     const storage = this.settings.getStorageConfig();
     if (!storage.configured) {
       return {
@@ -116,13 +110,6 @@ export class InstanceController {
       region: storage.region,
       forcePathStyle: storage.forcePathStyle,
     };
-  }
-
-  private assertAdmin() {
-    // Placeholder until AuthGuard + RBAC is wired.
-    // In production every call must be authorized with settings.view / settings.edit.
-    if (process.env.NODE_ENV === "test") return;
-    // Allow for foundation; lock down when auth ships
   }
 
   private redactStorage(s: ReturnType<InstanceSettingsService["getStorageConfig"]>) {

@@ -95,8 +95,8 @@ async function main() {
     );
     console.log("Sign in at /login with that username and password.");
     console.log(
-      "\nNote: authorization is not enforced yet, so the /admin pages are currently\n" +
-        "reachable by anyone who knows the URL. This role is recorded for when it is.",
+      "\nThis role holds every permission, so it can reach the administration\n" +
+        "pages under Settings and every route they use.",
     );
   } finally {
     await prisma.$disconnect();
