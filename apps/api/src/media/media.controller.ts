@@ -13,7 +13,8 @@ import { FileInterceptor } from "@nestjs/platform-express";
 import type { Response } from "express";
 import { MediaService, type MediaKind } from "./media.service";
 import { DirectoryError } from "../users/directory-error";
-import { Public } from "../auth/auth.decorators";
+import { CurrentUser, Public } from "../auth/auth.decorators";
+import type { AuthenticatedUser } from "../auth/authenticated-user";
 
 /** Avatar and banner uploads, and serving them back. */
 @Controller("media")
@@ -40,10 +41,12 @@ export class MediaController {
   @UseInterceptors(FileInterceptor("file", { limits: { fileSize: 12 * 1024 * 1024 } }))
   async upload(
     @UploadedFile() file: { buffer: Buffer; mimetype: string; size: number } | undefined,
+    @CurrentUser() auth: AuthenticatedUser,
     @Query("kind") kind?: string,
   ) {
-    const which: MediaKind = kind === "banner" ? "banner" : "avatar";
-    return this.unwrap(() => this.media.save(file, which));
+    const which: MediaKind =
+      kind === "banner" ? "banner" : kind === "post" ? "post" : "avatar";
+    return this.unwrap(() => this.media.save(file, which, auth.id));
   }
 
   /** Public: avatars appear on public profiles and in public timelines. */

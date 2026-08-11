@@ -88,9 +88,48 @@ orphan them or cascade away conversations that other people wrote.
 `deletableByViewer` travels with each post so the menu only offers what will
 actually work.
 
+## Writing a post
+
+The composer's four buttons each do what they depict.
+
+**Images.** Up to four, JPEG/PNG/WebP/GIF, 10 MB each. Uploaded to
+`POST /api/media/upload?kind=post`, which returns an id; the post references
+those ids. Ownership is checked at post time, so one account cannot attach
+another's upload. One image fills the width, two to four tile, and clicking
+opens a lightbox rather than the post.
+
+**Polls.** Two to four choices, closing between five minutes and a week.
+Choices are buttons until you vote or it closes, then bars — showing the tally
+first would anchor the answer. One vote per account, changeable while open;
+the option counters move with the vote row in one transaction, so a tally can
+never disagree with the votes behind it.
+
+Images and a poll are mutually exclusive. The buttons disable each other, and
+the API refuses the combination too.
+
+**Emoji.** A fixed, grouped list rather than a dependency — the full Unicode
+set is megabytes and needs a search index for something a composer reaches for
+a handful of. Inserted at the caret, not appended.
+
+**Scheduling.** `scheduledFor` on the create request stores a `ScheduledPost`
+instead of publishing; the response is `{ scheduled }` rather than `{ post }`.
+A timer in the API publishes what has come due every 30 seconds, claiming each
+row with an atomic status transition so two ticks cannot publish it twice.
+Anything that came due while the API was down goes out on the next tick.
+
+A poll cannot be scheduled: its timer starts when it is published, which would
+make the duration you chose meaningless.
+
+| Route | Requirement |
+|-------|-------------|
+| `POST /api/media/upload?kind=post` | signed in |
+| `POST /api/posts` with `mediaIds` / `poll` / `scheduledFor` | signed in |
+| `POST /api/posts/:id/poll/vote` | signed in |
+| `GET /api/posts/scheduled/mine` | signed in |
+| `DELETE /api/posts/scheduled/:id` | signed in, own |
+
 ## Not built
 
 Lists, communities and direct messages are modelled in the schema and have
-pages in the interface, but no implementation behind them. Post attachments
-(images, polls) are likewise unbuilt — the composer icons are inert. See
-[`configuration.md`](configuration.md) for profile media, which is done.
+pages in the interface, but no implementation behind them. See [`configuration.md`](configuration.md) for
+how uploaded media is stored.

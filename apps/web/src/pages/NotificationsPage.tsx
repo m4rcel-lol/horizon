@@ -146,10 +146,12 @@ export function NotificationsPage() {
                     <span className="block mt-1 text-[15px]">
                       <span className="font-bold">
                         {n.actor ? (
+                          // No nameHref here: the whole row is already a link
+                          // to the thing that happened, and the affiliate mark
+                          // renders as a plain image inside it.
                           <NameWithBadges
                             displayName={n.actor.displayName}
                             verification={n.actor.effectiveVerification}
-                            affiliatedTo={n.actor.affiliatedTo}
                             badgeClassName="w-[15px] h-[15px]"
                           />
                         ) : (

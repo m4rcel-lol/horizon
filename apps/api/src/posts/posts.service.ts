@@ -5,6 +5,7 @@ import { DirectoryError } from "../users/directory-error";
 import { UserDirectoryService, type PresentedUser } from "../users/user-directory.service";
 import { NotificationsService } from "../social/notifications.service";
 import { SocialService } from "../social/social.service";
+import { MediaService } from "../media/media.service";
 
 export interface PresentedPost {
   id: string;
@@ -33,6 +34,18 @@ export interface PresentedPost {
   bookmarkedByViewer: boolean;
   /** Whether the caller may delete it, so the menu only offers what will work. */
   deletableByViewer: boolean;
+  media: { id: string; url: string; mimeType: string; type: "IMAGE" | "GIF"; altText: string | null }[];
+  poll: PresentedPoll | null;
+}
+
+export interface PresentedPoll {
+  id: string;
+  expiresAt: string;
+  closed: boolean;
+  totalVotes: number;
+  /** Which option the caller chose, so their own vote is marked. */
+  votedOptionId: string | null;
+  options: { id: string; text: string; voteCount: number; share: number }[];
 }
 
 const POST_SELECT = {
@@ -47,6 +60,14 @@ const POST_SELECT = {
   replyToId: true,
   authorId: true,
   author: { select: { username: true } },
+  media: { orderBy: { position: "asc" }, select: { mediaId: true } },
+  poll: {
+    select: {
+      id: true,
+      expiresAt: true,
+      options: { orderBy: { position: "asc" }, select: { id: true, text: true, voteCount: true } },
+    },
+  },
 } as const;
 
 type PostRow = {
@@ -61,6 +82,12 @@ type PostRow = {
   replyToId: string | null;
   authorId: string;
   author: { username: string };
+  media: { mediaId: string }[];
+  poll: {
+    id: string;
+    expiresAt: Date;
+    options: { id: string; text: string; voteCount: number }[];
+  } | null;
 };
 
 /** Posts, stored in Postgres. */
@@ -74,7 +101,41 @@ export class PostsService {
     private readonly notifications: NotificationsService,
     @Inject(forwardRef(() => SocialService))
     private readonly social: SocialService,
+    private readonly mediaService: MediaService,
   ) {}
+
+  /**
+   * A poll with its shares worked out.
+   *
+   * Percentages are computed here rather than in the client so every surface
+   * that renders a poll agrees, and so a poll with no votes reads as 0% rather
+   * than NaN.
+   */
+  private async presentPoll(
+    poll: NonNullable<PostRow["poll"]>,
+    viewerId: string | null,
+  ): Promise<PresentedPoll> {
+    const total = poll.options.reduce((sum, o) => sum + o.voteCount, 0);
+    const vote = viewerId
+      ? await this.prisma.pollVote.findUnique({
+          where: { pollId_userId: { pollId: poll.id, userId: viewerId } },
+          select: { optionId: true },
+        })
+      : null;
+    return {
+      id: poll.id,
+      expiresAt: poll.expiresAt.toISOString(),
+      closed: poll.expiresAt.getTime() <= Date.now(),
+      totalVotes: total,
+      votedOptionId: vote?.optionId ?? null,
+      options: poll.options.map((o) => ({
+        id: o.id,
+        text: o.text,
+        voteCount: o.voteCount,
+        share: total === 0 ? 0 : Math.round((o.voteCount / total) * 100),
+      })),
+    };
+  }
 
   /**
    * @param viewerId the signed-in account, so liked/reposted state is the
@@ -141,6 +202,8 @@ export class PostsService {
         : null,
       bookmarkedByViewer: Boolean(bookmarked),
       deletableByViewer: viewerId === post.authorId,
+      media: await this.mediaService.describe(post.media.map((m) => m.mediaId)),
+      poll: post.poll ? await this.presentPoll(post.poll, viewerId) : null,
     };
   }
 
@@ -160,6 +223,8 @@ export class PostsService {
     replyToId?: string;
     quoteOfId?: string;
     viewerId?: string | null;
+    mediaIds?: string[];
+    poll?: { options: string[]; durationMinutes: number };
   }): Promise<PresentedPost> {
     // Reject unknown authors rather than storing a dangling handle.
     const author = await this.directory.get(input.author);
@@ -174,6 +239,29 @@ export class PostsService {
     if (input.replyToId) await this.requirePost(input.replyToId);
     if (input.quoteOfId) await this.requirePost(input.quoteOfId);
 
+    const mediaIds = input.mediaIds ?? [];
+    // Attaching someone else's upload would let one account put another's
+    // image on their post, so ownership is checked before anything is written.
+    await this.mediaService.assertOwned(mediaIds, author.id);
+
+    if (input.poll && mediaIds.length > 0) {
+      throw new DirectoryError(
+        "POLL_WITH_MEDIA",
+        "A post can carry images or a poll, not both.",
+        400,
+      );
+    }
+    if (input.poll) {
+      const options = input.poll.options.map((o) => o.trim()).filter(Boolean);
+      if (options.length < 2 || options.length > 4) {
+        throw new DirectoryError("POLL_OPTIONS", "A poll needs between two and four choices.", 400);
+      }
+      if (new Set(options.map((o) => o.toLowerCase())).size !== options.length) {
+        throw new DirectoryError("POLL_DUPLICATE", "Poll choices must be different.", 400);
+      }
+      input.poll = { ...input.poll, options };
+    }
+
     // The post and the parent's counter move together: a reply that is not
     // counted, or a count with no reply, are both wrong.
     const post = await this.prisma.$transaction(async (tx) => {
@@ -187,6 +275,23 @@ export class PostsService {
         },
         select: POST_SELECT,
       });
+
+      for (const [position, mediaId] of mediaIds.entries()) {
+        await tx.postMedia.create({ data: { postId: created.id, mediaId, position } });
+      }
+
+      if (input.poll) {
+        await tx.poll.create({
+          data: {
+            postId: created.id,
+            expiresAt: new Date(Date.now() + input.poll.durationMinutes * 60_000),
+            options: {
+              create: input.poll.options.map((text, position) => ({ text, position })),
+            },
+          },
+        });
+      }
+
       if (input.replyToId) {
         await tx.post.update({
           where: { id: input.replyToId },
@@ -199,7 +304,12 @@ export class PostsService {
           data: { quoteCount: { increment: 1 } },
         });
       }
-      return created as PostRow;
+      // Re-read after the attachments and poll are written: the row selected
+      // at creation predates them and would render an empty post.
+      return (await tx.post.findUniqueOrThrow({
+        where: { id: created.id },
+        select: POST_SELECT,
+      })) as PostRow;
     });
 
     // After the post is safely written: a failed notification must not undo it.
@@ -253,6 +363,47 @@ export class PostsService {
       select: POST_SELECT,
     })) as PostRow[];
     return Promise.all(posts.map((p) => this.present(p, viewerId)));
+  }
+
+  /**
+   * Vote in a poll.
+   *
+   * One vote per account, changeable while the poll is open — the option
+   * counters move with the vote row in one transaction so a tally can never
+   * disagree with the votes behind it.
+   */
+  async votePoll(postId: string, optionId: string, userId: string): Promise<PresentedPost> {
+    const option = await this.prisma.pollOption.findUnique({
+      where: { id: optionId },
+      select: { id: true, pollId: true, poll: { select: { postId: true, expiresAt: true } } },
+    });
+    if (!option || option.poll.postId !== postId) {
+      throw new DirectoryError("OPTION_NOT_FOUND", "That choice is not on this poll.", 404);
+    }
+    if (option.poll.expiresAt.getTime() <= Date.now()) {
+      throw new DirectoryError("POLL_CLOSED", "This poll has closed.", 409);
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      const existing = await tx.pollVote.findUnique({
+        where: { pollId_userId: { pollId: option.pollId, userId } },
+        select: { id: true, optionId: true },
+      });
+      if (existing?.optionId === optionId) return;
+
+      if (existing) {
+        await tx.pollOption.update({
+          where: { id: existing.optionId },
+          data: { voteCount: { decrement: 1 } },
+        });
+        await tx.pollVote.update({ where: { id: existing.id }, data: { optionId } });
+      } else {
+        await tx.pollVote.create({ data: { pollId: option.pollId, optionId, userId } });
+      }
+      await tx.pollOption.update({ where: { id: optionId }, data: { voteCount: { increment: 1 } } });
+    });
+
+    return this.get(postId, userId);
   }
 
   /**

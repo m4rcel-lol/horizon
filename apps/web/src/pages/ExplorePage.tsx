@@ -6,7 +6,7 @@ import { api } from "../api";
 import { PostCard } from "../components/PostCard";
 import { ComposerModal, type ComposerTarget } from "../components/ComposerModal";
 import { Avatar, NameWithBadges } from "../components/Verification";
-import { PageLoader } from "../components/LoadingSpinner";
+import { TimelineSkeleton } from "../components/LoadingSpinner";
 
 const tabs = [
   { id: "top", label: "Top" },
@@ -93,7 +93,7 @@ export function ExplorePage() {
           </p>
         </div>
       ) : isLoading ? (
-        <PageLoader label="Searching…" />
+        <TimelineSkeleton rows={3} />
       ) : nothing ? (
         <div className="empty-state">
           <h2>No results for “{query}”</h2>
@@ -114,34 +114,37 @@ export function ExplorePage() {
               <ul>
                 {users.map((u) => (
                   <li key={u.id}>
-                    <Link
-                      to={`/${u.username}`}
+                    <div
                       className="flex gap-3 px-4 py-3 border-b transition-colors hover:bg-[var(--color-row-hover)]"
                       style={{ borderColor: "var(--color-border)" }}
                     >
-                      <Avatar
-                        shape={u.avatarShape}
-                        size={44}
-                        src={u.avatarUrl || "/assets/default-avatar.svg"}
-                      />
-                      <span className="min-w-0">
+                      <Link to={`/${u.username}`} className="shrink-0">
+                        <Avatar
+                          shape={u.avatarShape}
+                          size={44}
+                          src={u.avatarUrl || "/assets/default-avatar.svg"}
+                        />
+                      </Link>
+                      <div className="min-w-0">
                         <span className="block font-bold text-[15px]">
                           <NameWithBadges
                             displayName={u.displayName}
                             verification={u.effectiveVerification}
                             affiliatedTo={u.affiliatedTo}
+                            nameHref={`/${u.username}`}
                             badgeClassName="w-[16px] h-[16px]"
                           />
                         </span>
-                        <span
-                          className="block text-[15px]"
+                        <Link
+                          to={`/${u.username}`}
+                          className="block text-[15px] hover:underline"
                           style={{ color: "var(--color-text-secondary)" }}
                         >
                           @{u.username}
-                        </span>
-                        {u.bio ? <span className="block mt-1 text-[15px]">{u.bio}</span> : null}
-                      </span>
-                    </Link>
+                        </Link>
+                        {u.bio ? <p className="mt-1 text-[15px]">{u.bio}</p> : null}
+                      </div>
+                    </div>
                   </li>
                 ))}
               </ul>

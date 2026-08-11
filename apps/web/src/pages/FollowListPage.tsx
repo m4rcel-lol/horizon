@@ -65,14 +65,15 @@ export function FollowListPage({ mode }: { mode: "followers" | "following" }) {
                 />
               </Link>
               <div className="min-w-0 flex-1">
-                <Link to={`/${u.username}`} className="block font-bold text-[15px] hover:underline">
+                <span className="block font-bold text-[15px]">
                   <NameWithBadges
                     displayName={u.displayName}
                     verification={u.effectiveVerification}
                     affiliatedTo={u.affiliatedTo}
+                    nameHref={`/${u.username}`}
                     badgeClassName="w-[16px] h-[16px]"
                   />
-                </Link>
+                </span>
                 <p className="text-[15px]" style={{ color: "var(--color-text-secondary)" }}>
                   @{u.username}
                 </p>

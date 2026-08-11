@@ -8,6 +8,7 @@ import { PostCard } from "../components/PostCard";
 import { EditProfileModal } from "../components/EditProfileModal";
 import { ComposerModal, type ComposerTarget } from "../components/ComposerModal";
 import { FollowButton } from "../components/FollowButton";
+import { FollowsYouChip } from "../components/FollowsYouChip";
 import { PageLoader } from "../components/LoadingSpinner";
 import { useSession } from "../hooks/useSession";
 
@@ -135,8 +136,12 @@ export function ProfilePage() {
                   badgeTitle={user && user.affiliateCount > 0 ? "See affiliated accounts" : undefined}
                 />
               </h2>
-              <p className="text-[15px]" style={{ color: "var(--color-text-secondary)" }}>
-                @{user?.username ?? active?.username ?? handle}
+              <p
+                className="text-[15px] flex items-center gap-2 flex-wrap"
+                style={{ color: "var(--color-text-secondary)" }}
+              >
+                <span>@{user?.username ?? active?.username ?? handle}</span>
+                {user ? <FollowsYouChip username={user.username} /> : null}
               </p>
             </div>
 

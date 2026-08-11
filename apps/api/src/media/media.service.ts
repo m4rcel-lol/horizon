@@ -4,6 +4,7 @@ import { createReadStream, existsSync } from "fs";
 import { mkdir, writeFile, stat } from "fs/promises";
 import { extname, join, resolve } from "path";
 import { DirectoryError } from "../users/directory-error";
+import { PrismaService } from "../database/prisma.service";
 
 /** What a browser may upload as an avatar or banner. GIFs included, animated ones kept. */
 const ALLOWED = new Map<string, string>([
@@ -16,6 +17,7 @@ const ALLOWED = new Map<string, string>([
 const LIMITS = {
   avatar: 5 * 1024 * 1024,
   banner: 10 * 1024 * 1024,
+  post: 10 * 1024 * 1024,
 } as const;
 
 export type MediaKind = keyof typeof LIMITS;
@@ -36,6 +38,8 @@ export class MediaService implements OnModuleInit {
   private readonly logger = new Logger(MediaService.name);
   private readonly root = resolve(process.env.MEDIA_ROOT ?? join(process.cwd(), "data", "media"));
 
+  constructor(private readonly prisma: PrismaService) {}
+
   async onModuleInit() {
     await mkdir(this.root, { recursive: true }).catch((error) => {
       this.logger.error(`Could not create the media directory at ${this.root}: ${error}`);
@@ -46,7 +50,8 @@ export class MediaService implements OnModuleInit {
   async save(
     file: { buffer: Buffer; mimetype: string; size: number } | undefined,
     kind: MediaKind,
-  ): Promise<{ url: string }> {
+    uploaderId?: string,
+  ): Promise<{ url: string; id?: string }> {
     if (!file) {
       throw new DirectoryError("NO_FILE", "No file was uploaded.", 400);
     }
@@ -81,7 +86,59 @@ export class MediaService implements OnModuleInit {
 
     const name = `${randomUUID()}${extension}`;
     await writeFile(join(this.root, name), file.buffer);
-    return { url: `/api/media/${name}` };
+    const url = `/api/media/${name}`;
+
+    // Avatars and banners are a URL on the account and need no row of their
+    // own. A post attachment does: the post references it by id, and the row
+    // is what carries alt text and the uploader.
+    if (kind !== "post") return { url };
+
+    const media = await this.prisma.media.create({
+      data: {
+        uploaderId: uploaderId ?? null,
+        type: file.mimetype === "image/gif" ? "GIF" : "IMAGE",
+        mimeType: file.mimetype,
+        sizeBytes: file.size,
+        originalKey: name,
+        processed: true,
+      },
+      select: { id: true },
+    });
+    return { url, id: media.id };
+  }
+
+  /** Resolve stored attachments to what a client needs to render them. */
+  async describe(ids: string[]) {
+    if (ids.length === 0) return [];
+    const rows = await this.prisma.media.findMany({
+      where: { id: { in: ids }, deletedAt: null },
+      select: { id: true, originalKey: true, mimeType: true, type: true, altText: true },
+    });
+    const byId = new Map(rows.map((r) => [r.id, r]));
+    return ids
+      .map((id) => byId.get(id))
+      .filter((r): r is NonNullable<typeof r> => Boolean(r))
+      .map((r) => ({
+        id: r.id,
+        url: `/api/media/${r.originalKey}`,
+        mimeType: r.mimeType,
+        type: r.type as "IMAGE" | "GIF",
+        altText: r.altText,
+      }));
+  }
+
+  /** Every id must exist and belong to the uploader, or the post is refused. */
+  async assertOwned(ids: string[], uploaderId: string) {
+    if (ids.length === 0) return;
+    if (ids.length > 4) {
+      throw new DirectoryError("TOO_MANY_ATTACHMENTS", "A post can carry up to four images.", 400);
+    }
+    const count = await this.prisma.media.count({
+      where: { id: { in: ids }, uploaderId, deletedAt: null },
+    });
+    if (count !== ids.length) {
+      throw new DirectoryError("UNKNOWN_ATTACHMENT", "One of those uploads is not yours.", 400);
+    }
   }
 
   /**

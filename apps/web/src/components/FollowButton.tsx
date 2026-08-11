@@ -67,11 +67,6 @@ export function FollowButton({ username, className = "" }: { username: string; c
       >
         {following ? (hover ? "Unfollow" : "Following") : "Follow"}
       </button>
-      {data?.followsYou && !following ? (
-        <span className="mt-1 text-[12px]" style={{ color: "var(--color-text-secondary)" }}>
-          Follows you
-        </span>
-      ) : null}
       {error ? (
         <span role="alert" className="mt-1 text-[12px]" style={{ color: "var(--color-danger)" }}>
           {error}

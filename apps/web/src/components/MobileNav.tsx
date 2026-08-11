@@ -205,13 +205,14 @@ export function MobileDrawer({ open, onClose }: { open: boolean; onClose: () => 
 
           {active ? (
             <div className="mt-3">
-              <Link to={`/${active.username}`} className="font-bold text-[17px] hover:underline">
+              <span className="font-bold text-[17px]">
                 <NameWithBadges
                   displayName={active.displayName}
                   verification={active.effectiveVerification}
                   affiliatedTo={active.affiliatedTo}
+                  nameHref={`/${active.username}`}
                 />
-              </Link>
+              </span>
               <p className="text-[14px]" style={{ color: "var(--color-text-secondary)" }}>
                 @{active.username}
               </p>

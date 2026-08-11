@@ -3,6 +3,7 @@ import type { ApiPost } from "../api";
 import { Avatar, NameWithBadges } from "./Verification";
 import { CommunityNoteCard } from "./CommunityNote";
 import { PostActions } from "./PostActions";
+import { PostMediaGrid, PostPoll } from "./PostMedia";
 
 /** "3h", "2d", or a date once it stops being recent. */
 function relativeTime(iso: string): string {
@@ -113,6 +114,7 @@ export function PostCard({
       displayName={author?.displayName ?? `@${handle}`}
       verification={author?.effectiveVerification ?? "NONE"}
       affiliatedTo={author?.affiliatedTo}
+      nameHref={`/${handle}`}
       badgeHref={author && author.affiliateCount > 0 ? `/${handle}/affiliates` : undefined}
       badgeTitle={author && author.affiliateCount > 0 ? "See affiliated accounts" : undefined}
     />
@@ -139,6 +141,9 @@ export function PostCard({
       >
         {post.content}
       </p>
+
+      <PostMediaGrid media={post.media} />
+      {post.poll ? <PostPoll postId={post.id} poll={post.poll} /> : null}
 
       {post.quoteOf ? <QuotedPost post={post.quoteOf} /> : null}
 
@@ -176,9 +181,7 @@ export function PostCard({
             />
           </Link>
           <div className="min-w-0">
-            <Link to={`/${handle}`} className="font-bold leading-5 hover:underline">
-              {identity}
-            </Link>
+            <span className="font-bold leading-5">{identity}</span>
             <p className="text-[15px]" style={{ color: "var(--color-text-secondary)" }}>
               @{handle}
             </p>
@@ -215,13 +218,9 @@ export function PostCard({
       </Link>
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-1 text-[15px] min-w-0">
-          <Link
-            to={`/${handle}`}
-            className="font-bold hover:underline min-w-0"
-            onClick={(event) => event.stopPropagation()}
-          >
+          <span className="font-bold min-w-0" onClick={(event) => event.stopPropagation()}>
             {identity}
-          </Link>
+          </span>
           <span className="truncate" style={{ color: "var(--color-text-secondary)" }}>
             @{handle}
           </span>
