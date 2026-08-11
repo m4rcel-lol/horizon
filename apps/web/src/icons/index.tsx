@@ -235,3 +235,12 @@ export function RobotIcon(props: IconProps) {
     </svg>
   );
 }
+
+/** Padlock: marks a private account, whose posts need approval to read. */
+export function LockIcon(props: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" {...props}>
+      <path d="M12 2a5 5 0 0 0-5 5v2.5H6.25A2.25 2.25 0 0 0 4 11.75v8A2.25 2.25 0 0 0 6.25 22h11.5A2.25 2.25 0 0 0 20 19.75v-8a2.25 2.25 0 0 0-2.25-2.25H17V7a5 5 0 0 0-5-5zm0 2.5A2.5 2.5 0 0 1 14.5 7v2.5h-5V7A2.5 2.5 0 0 1 12 4.5z" />
+    </svg>
+  );
+}

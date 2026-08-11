@@ -4,6 +4,9 @@ import { ArrowLeftIcon } from "../icons";
 import { useTheme } from "../theme";
 import { useSession } from "../hooks/useSession";
 import { PERMISSIONS } from "@horizon/shared";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Avatar, NameWithBadges } from "../components/Verification";
+import { api } from "../api";
 
 const sections = [
   { to: "/settings/appearance", label: "Appearance", description: "Theme and display" },
@@ -312,6 +315,9 @@ export function SettingsPrivacyPage() {
         </label>
       </section>
 
+      <FollowRequests />
+
+
       <section>
         <h3 className="text-[17px] font-bold mb-2">Who can message me</h3>
         <p className="text-[14px] mb-3" style={{ color: "var(--color-text-secondary)" }}>
@@ -431,5 +437,92 @@ export function SettingsAutomationPage() {
         </p>
       ) : null}
     </div>
+  );
+}
+
+/**
+ * People waiting to follow a private account.
+ *
+ * Lives with the privacy toggle that creates them: turning the account private
+ * is what starts producing requests, so this is where you would look for them.
+ * It renders nothing at all when there are none, rather than an empty box on
+ * every public account's settings page.
+ */
+function FollowRequests() {
+  const queryClient = useQueryClient();
+  const { data, isLoading } = useQuery({
+    queryKey: ["follow-requests"],
+    queryFn: api.followRequests,
+    retry: false,
+  });
+
+  const resolve = useMutation({
+    mutationFn: ({ username, approve }: { username: string; approve: boolean }) =>
+      api.resolveFollowRequest(username, approve),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["follow-requests"] });
+      queryClient.invalidateQueries({ queryKey: ["user"] });
+      queryClient.invalidateQueries({ queryKey: ["follow-list"] });
+    },
+  });
+
+  const users = data?.users ?? [];
+  if (isLoading || users.length === 0) return null;
+
+  return (
+    <section className="mb-8">
+      <h3 className="text-[17px] font-bold mb-2">
+        Follow requests <span style={{ color: "var(--color-text-secondary)" }}>({users.length})</span>
+      </h3>
+      <p className="text-[14px] mb-3" style={{ color: "var(--color-text-secondary)" }}>
+        Approving one lets that account see your posts. Until then they see only what a stranger
+        would.
+      </p>
+      <ul className="flex flex-col gap-2">
+        {users.map((u) => (
+          <li
+            key={u.id}
+            className="flex items-center gap-3 rounded-2xl border p-3"
+            style={{ borderColor: "var(--color-border)" }}
+          >
+            <Avatar
+              shape={u.avatarShape}
+              size={40}
+              src={u.avatarUrl || "/assets/default-avatar.svg"}
+            />
+            <div className="min-w-0 flex-1">
+              <Link to={`/${u.username}`} className="font-bold hover:underline block truncate">
+                <NameWithBadges
+                  displayName={u.displayName}
+                  verification={u.effectiveVerification}
+                  badgeClassName="w-[15px] h-[15px]"
+                />
+              </Link>
+              <span className="text-[14px] truncate" style={{ color: "var(--color-text-secondary)" }}>
+                @{u.username}
+              </span>
+            </div>
+            <div className="flex gap-2 shrink-0">
+              <button
+                type="button"
+                className="btn btn-outline"
+                disabled={resolve.isPending}
+                onClick={() => resolve.mutate({ username: u.username, approve: false })}
+              >
+                Decline
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary"
+                disabled={resolve.isPending}
+                onClick={() => resolve.mutate({ username: u.username, approve: true })}
+              >
+                Accept
+              </button>
+            </div>
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }

@@ -98,6 +98,8 @@ model User {
   communitiesOwned  Community[]    @relation("CommunityOwner")
   communityMemberships CommunityMember[]
   communityJoinRequests CommunityJoinRequest[]
+  followRequestsSent     FollowRequest[] @relation("FollowRequester")
+  followRequestsReceived FollowRequest[] @relation("FollowRequestTarget")
   reportsFiled      Report[]       @relation("Reporter")
   reportsAgainst    Report[]       @relation("ReportedUser")
   moderationActions ModerationAction[] @relation("ModerationTarget")
@@ -418,6 +420,23 @@ model Follow {
   @@id([followerId, followingId])
   @@index([followingId])
   @@index([followerId, createdAt(sort: Desc)])
+}
+
+/// A follow waiting on a private account's approval.
+///
+/// Kept separate from Follow rather than adding a status column to it, so every
+/// query that reads Follow still means "is actually following" with no filter
+/// to forget — a pending row must never be able to leak posts.
+model FollowRequest {
+  requesterId String
+  targetId    String
+  createdAt   DateTime @default(now())
+
+  requester User @relation("FollowRequester", fields: [requesterId], references: [id], onDelete: Cascade)
+  target    User @relation("FollowRequestTarget", fields: [targetId], references: [id], onDelete: Cascade)
+
+  @@id([requesterId, targetId])
+  @@index([targetId, createdAt(sort: Desc)])
 }
 
 model Block {

@@ -12,6 +12,11 @@ class SetFlagDto {
   on!: boolean;
 }
 
+class ApproveDto {
+  @IsBoolean()
+  approve!: boolean;
+}
+
 async function unwrap<T>(fn: () => Promise<T>): Promise<T> {
   try {
     return await fn();
@@ -35,6 +40,27 @@ export class FollowController {
     @CurrentUser() auth: AuthenticatedUser,
   ) {
     return unwrap(() => this.social.setFollow(auth.id, username, body.on));
+  }
+
+  /**
+   * People waiting for you to approve their follow.
+   *
+   * Declared before the `:username/...` routes below so that the literal
+   * segment wins the match rather than being read as a username.
+   */
+  @Get("follow-requests/mine")
+  async followRequests(@CurrentUser() auth: AuthenticatedUser) {
+    return unwrap(async () => ({ users: await this.social.followRequests(auth.id) }));
+  }
+
+  /** Approve or decline one of them. Only the account being followed may. */
+  @Post("follow-requests/:username")
+  async resolveFollowRequest(
+    @Param("username") username: string,
+    @Body() body: ApproveDto,
+    @CurrentUser() auth: AuthenticatedUser,
+  ) {
+    return unwrap(() => this.social.resolveFollowRequest(auth.id, username, body.approve));
   }
 
   /** Whether the caller follows them, and whether they follow back. */

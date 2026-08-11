@@ -22,7 +22,7 @@ export class SocialService {
   private async requireUser(username: string) {
     const user = await this.prisma.user.findFirst({
       where: { username, status: { not: "DELETED" } },
-      select: { id: true, username: true, isSystem: true },
+      select: { id: true, username: true, isSystem: true, isProtected: true },
     });
     if (!user) {
       throw new DirectoryError("USER_NOT_FOUND", `No account @${username} on this instance.`, 404);
@@ -31,8 +31,14 @@ export class SocialService {
   }
 
   /**
-   * Follow or unfollow. Sending the state you want rather than toggling, so a
-   * retried request cannot land you on the opposite of what you asked for.
+   * Follow, ask to follow, or unfollow.
+   *
+   * Sending the state you want rather than toggling, so a retried request
+   * cannot land you on the opposite of what you asked for.
+   *
+   * A private account turns the follow into a request. Nothing about the
+   * follower's view changes until it is approved: no Follow row exists, so
+   * every query that reads follows still excludes them.
    */
   async setFollow(followerId: string, username: string, following: boolean) {
     const target = await this.requireUser(username);
@@ -46,33 +52,135 @@ export class SocialService {
     });
 
     if (following && !existing) {
+      if (target.isProtected) {
+        const alreadyAsked = await this.prisma.followRequest.findUnique({
+          where: { requesterId_targetId: { requesterId: followerId, targetId: target.id } },
+          select: { requesterId: true },
+        });
+        if (!alreadyAsked) {
+          await this.prisma.followRequest.create({
+            data: { requesterId: followerId, targetId: target.id },
+          });
+          await this.notifications.record({
+            recipientId: target.id,
+            actorId: followerId,
+            type: "FOLLOW_REQUEST",
+          });
+        }
+        return { user: await this.directory.get(username), following: false, requested: true };
+      }
       await this.prisma.follow.create({ data: { followerId, followingId: target.id } });
       await this.notifications.record({
         recipientId: target.id,
         actorId: followerId,
         type: "FOLLOW",
       });
-    } else if (!following && existing) {
-      await this.prisma.follow.delete({
-        where: { followerId_followingId: { followerId, followingId: target.id } },
+    } else if (!following) {
+      if (existing) {
+        await this.prisma.follow.delete({
+          where: { followerId_followingId: { followerId, followingId: target.id } },
+        });
+        await this.notifications.withdraw({
+          recipientId: target.id,
+          actorId: followerId,
+          type: "FOLLOW",
+        });
+      }
+      // Unfollowing also withdraws a request that was never answered —
+      // otherwise pressing the button again would look like nothing happened.
+      await this.prisma.followRequest.deleteMany({
+        where: { requesterId: followerId, targetId: target.id },
       });
       await this.notifications.withdraw({
         recipientId: target.id,
         actorId: followerId,
-        type: "FOLLOW",
+        type: "FOLLOW_REQUEST",
       });
     }
 
-    return { user: await this.directory.get(username), following };
+    return { user: await this.directory.get(username), following, requested: false };
   }
 
-  /** Does the caller follow this account, and does it follow them back? */
+  /** Pending requests to follow you, for the approval list. */
+  async followRequests(userId: string): Promise<PresentedUser[]> {
+    const rows = await this.prisma.followRequest.findMany({
+      where: { targetId: userId },
+      orderBy: { createdAt: "desc" },
+      take: 200,
+      select: { requester: { select: { username: true } } },
+    });
+    return this.presentAll(rows.map((r) => r.requester.username));
+  }
+
+  /**
+   * Approve or decline someone waiting to follow you.
+   *
+   * Approving is what creates the Follow row — until then the requester has
+   * seen nothing they could not have seen as a stranger.
+   */
+  async resolveFollowRequest(userId: string, requesterUsername: string, approve: boolean) {
+    const requester = await this.requireUser(requesterUsername);
+    const pending = await this.prisma.followRequest.findUnique({
+      where: { requesterId_targetId: { requesterId: requester.id, targetId: userId } },
+      select: { requesterId: true },
+    });
+    if (!pending) {
+      throw new DirectoryError("REQUEST_NOT_FOUND", "That follow request is no longer pending.", 404);
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.followRequest.delete({
+        where: { requesterId_targetId: { requesterId: requester.id, targetId: userId } },
+      });
+      if (approve) {
+        await tx.follow.upsert({
+          where: { followerId_followingId: { followerId: requester.id, followingId: userId } },
+          create: { followerId: requester.id, followingId: userId },
+          update: {},
+        });
+      }
+      // The ask has been answered either way, so it stops sitting in the
+      // recipient's notifications as though it were still open.
+      await tx.notification.deleteMany({
+        where: { recipientId: userId, actorId: requester.id, type: "FOLLOW_REQUEST" },
+      });
+      if (approve) {
+        await tx.notification.create({
+          data: {
+            recipientId: requester.id,
+            actorId: userId,
+            type: "FOLLOW",
+            data: { kind: "FOLLOW_APPROVED" },
+          },
+        });
+      }
+    });
+
+    return { ok: true as const, approved: approve };
+  }
+
+  /** Does the caller follow this account, does it follow them back, and may they see it? */
   async relationship(viewerId: string | null, username: string) {
     const target = await this.requireUser(username);
-    if (!viewerId || viewerId === target.id) {
-      return { following: false, followsYou: false, isSelf: viewerId === target.id };
+    if (viewerId === target.id) {
+      return {
+        following: false,
+        followsYou: false,
+        isSelf: true,
+        requested: false,
+        canViewPosts: true,
+      };
     }
-    const [out, back] = await Promise.all([
+    if (!viewerId) {
+      return {
+        following: false,
+        followsYou: false,
+        isSelf: false,
+        requested: false,
+        canViewPosts: !target.isProtected,
+      };
+    }
+    const [out, back, pending] = await Promise.all([
       this.prisma.follow.findUnique({
         where: { followerId_followingId: { followerId: viewerId, followingId: target.id } },
         select: { followerId: true },
@@ -81,8 +189,43 @@ export class SocialService {
         where: { followerId_followingId: { followerId: target.id, followingId: viewerId } },
         select: { followerId: true },
       }),
+      this.prisma.followRequest.findUnique({
+        where: { requesterId_targetId: { requesterId: viewerId, targetId: target.id } },
+        select: { requesterId: true },
+      }),
     ]);
-    return { following: Boolean(out), followsYou: Boolean(back), isSelf: false };
+    return {
+      following: Boolean(out),
+      followsYou: Boolean(back),
+      isSelf: false,
+      requested: Boolean(pending),
+      canViewPosts: !target.isProtected || Boolean(out),
+    };
+  }
+
+  /**
+   * Accounts whose top-level posts this viewer must not be shown: private
+   * accounts they do not follow.
+   *
+   * One query, resolved once per listing rather than per post, and returned as
+   * a list of ids so callers can drop it straight into a `notIn`. Replies are
+   * deliberately not covered — a private account's replies stay visible, so a
+   * thread does not turn into holes for everyone else reading it.
+   */
+  async hiddenAuthorIds(viewerId: string | null): Promise<string[]> {
+    const protectedUsers = await this.prisma.user.findMany({
+      where: { isProtected: true, status: { not: "DELETED" } },
+      select: { id: true },
+    });
+    if (protectedUsers.length === 0) return [];
+    if (!viewerId) return protectedUsers.map((u) => u.id);
+
+    const visible = await this.prisma.follow.findMany({
+      where: { followerId: viewerId, followingId: { in: protectedUsers.map((u) => u.id) } },
+      select: { followingId: true },
+    });
+    const allowed = new Set([...visible.map((f) => f.followingId), viewerId]);
+    return protectedUsers.map((u) => u.id).filter((id) => !allowed.has(id));
   }
 
   async followers(username: string): Promise<PresentedUser[]> {

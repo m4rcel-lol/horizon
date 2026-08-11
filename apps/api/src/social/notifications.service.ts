@@ -31,6 +31,7 @@ export type NotificationKind =
  * to write the sentence.
  */
 export type NotificationDetail =
+  | "FOLLOW_APPROVED"
   | "JOIN_REQUEST"
   | "JOIN_APPROVED"
   | "AUTOMATION_REQUEST"

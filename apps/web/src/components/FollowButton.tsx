@@ -41,13 +41,26 @@ export function FollowButton({ username, className = "" }: { username: string; c
   if (data?.isSelf) return null;
 
   const following = data?.following ?? false;
+  // A private account turns Follow into a request, so the button has a third
+  // state: asked, and waiting. Pressing it again withdraws the request, which
+  // is the same call as unfollowing.
+  const requested = data?.requested ?? false;
+  const label = following
+    ? hover
+      ? "Unfollow"
+      : "Following"
+    : requested
+      ? hover
+        ? "Withdraw"
+        : "Requested"
+      : "Follow";
 
   return (
     <span className="inline-flex flex-col items-end">
       <button
         type="button"
-        className={`btn ${following ? "btn-outline" : "btn-primary"} ${className}`}
-        aria-pressed={following}
+        className={`btn ${following || requested ? "btn-outline" : "btn-primary"} ${className}`}
+        aria-pressed={following || requested}
         disabled={set.isPending}
         onMouseEnter={() => setHover(true)}
         onMouseLeave={() => setHover(false)}
@@ -57,15 +70,15 @@ export function FollowButton({ username, className = "" }: { username: string; c
             return;
           }
           setError(null);
-          set.mutate(!following);
+          set.mutate(!(following || requested));
         }}
         style={
-          following && hover
+          (following || requested) && hover
             ? { color: "var(--color-danger, #f91880)", borderColor: "var(--color-danger, #f91880)" }
             : undefined
         }
       >
-        {following ? (hover ? "Unfollow" : "Following") : "Follow"}
+        {label}
       </button>
       {error ? (
         <span role="alert" className="mt-1 text-[12px]" style={{ color: "var(--color-danger)" }}>

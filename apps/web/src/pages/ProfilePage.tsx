@@ -53,6 +53,17 @@ export function ProfilePage() {
   });
   const posts = postData?.posts ?? [];
 
+  const { data: relationship } = useQuery({
+    queryKey: ["relationship", handle],
+    queryFn: () => api.relationship(handle!),
+    enabled: Boolean(handle) && !notFound && !isOwnProfile,
+    retry: false,
+  });
+  // A private account returns an empty timeline to anyone it has not approved.
+  // Saying "no posts yet" there would be a lie about the account rather than a
+  // statement about the reader, so the two cases are told apart here.
+  const withheld = Boolean(relationship && !relationship.canViewPosts);
+
   const bannerSrc = localBanner || user?.bannerUrl || null;
   const avatarSrc =
     localAvatar || user?.avatarUrl || active?.avatarUrl || "/assets/default-avatar.svg";
@@ -138,12 +149,9 @@ export function ProfilePage() {
                   badgeClassName="w-5 h-5"
                   badgeHref={user && user.affiliateCount > 0 ? `/${user.username}/affiliates` : undefined}
                   badgeTitle={user && user.affiliateCount > 0 ? "See affiliated accounts" : undefined}
+                  isProtected={user?.isProtected}
+                  isAutomated={Boolean(user?.automatedBy) && !user?.automatedPending}
                 />
-                {user?.isProtected ? (
-                  <span title="Private account" aria-label="Private account">
-                    🔒
-                  </span>
-                ) : null}
               </h2>
               <p
                 className="text-[15px] flex items-center gap-2 flex-wrap"
@@ -269,6 +277,14 @@ export function ProfilePage() {
             </li>
           ))}
         </ul>
+      ) : withheld ? (
+        <div className="empty-state">
+          <h2>These posts are protected</h2>
+          <p>
+            Only people @{user?.username ?? handle} has approved can see their posts. Their replies
+            stay visible to everyone.
+          </p>
+        </div>
       ) : (
         <div className="empty-state">
           <h2>No posts yet</h2>

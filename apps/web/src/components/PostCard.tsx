@@ -122,6 +122,8 @@ export function PostCard({
       nameHref={`/${handle}`}
       badgeHref={author && author.affiliateCount > 0 ? `/${handle}/affiliates` : undefined}
       badgeTitle={author && author.affiliateCount > 0 ? "See affiliated accounts" : undefined}
+      isProtected={author?.isProtected}
+      isAutomated={Boolean(author?.automatedBy) && !author?.automatedPending}
     />
   );
 

@@ -389,11 +389,24 @@ export class PostsService {
     return this.present(post, input.viewerId ?? author.id);
   }
 
-  /** Posts by id, in the order given — used by bookmarks and search. */
+  /**
+   * Posts a viewer must not be shown, as a Prisma filter.
+   *
+   * The rule is top-level posts only: a private account's replies stay
+   * readable, so a thread does not turn into holes for everyone else in it.
+   * Written once here because four separate read paths need exactly this.
+   */
+  private audienceFilter(hidden: string[]) {
+    if (hidden.length === 0) return {};
+    return { NOT: { AND: [{ authorId: { in: hidden } }, { replyToId: null }] } };
+  }
+
+  /** Posts by id, in the order given — used by bookmarks, search and communities. */
   async byIds(ids: string[], viewerId: string | null = null): Promise<PresentedPost[]> {
     if (ids.length === 0) return [];
+    const hidden = await this.social.hiddenAuthorIds(viewerId);
     const posts = (await this.prisma.post.findMany({
-      where: { id: { in: ids }, deletedAt: null },
+      where: { id: { in: ids }, deletedAt: null, ...this.audienceFilter(hidden) },
       select: POST_SELECT,
     })) as PostRow[];
     const byId = new Map(posts.map((p) => [p.id, p]));
@@ -482,11 +495,17 @@ export class PostsService {
    * fragments.
    */
   async list(author?: string, viewerId: string | null = null): Promise<PresentedPost[]> {
+    // Private accounts keep their timeline to approved followers. This is the
+    // listing both the public feed and a profile page come through, so the
+    // filter belongs here rather than at either call site.
+    const hidden = await this.social.hiddenAuthorIds(viewerId);
+
     const posts = (await this.prisma.post.findMany({
       where: {
         deletedAt: null,
         replyToId: null,
         ...(author ? { author: { username: author } } : {}),
+        ...(hidden.length ? { authorId: { notIn: hidden } } : {}),
       },
       orderBy: { createdAt: "desc" },
       take: 100,
@@ -500,7 +519,19 @@ export class PostsService {
     // their timeline — placed by when they reposted it, not when it was
     // written, which is the order the visitor is reading in.
     const reposts = await this.prisma.postRepost.findMany({
-      where: { user: { username: author }, post: { deletedAt: null } },
+      where: {
+        // The second clause withholds a private account's own reposts:
+        // otherwise their profile would be empty of posts but still full of
+        // everything they had reposted.
+        user: { username: author, ...(hidden.length ? { id: { notIn: hidden } } : {}) },
+        post: {
+          deletedAt: null,
+          // A repost carries the original post's audience with it, so
+          // reposting cannot surface a private account's post to people that
+          // account has not approved.
+          ...(hidden.length ? { authorId: { notIn: hidden } } : {}),
+        },
+      },
       orderBy: { createdAt: "desc" },
       take: 100,
       select: {
@@ -543,9 +574,12 @@ export class PostsService {
     withPendingNotes = false,
   ): Promise<PresentedPost> {
     const post = (await this.prisma.post.findFirst({
-      where: { id, deletedAt: null },
+      where: { id, deletedAt: null, ...this.audienceFilter(await this.social.hiddenAuthorIds(viewerId)) },
       select: POST_SELECT,
     })) as PostRow | null;
+    // Deliberately the same 404 as a post that does not exist: a distinct
+    // "you may not see this" would confirm the post is there, which is what
+    // hiding it was for.
     if (!post) throw new DirectoryError("POST_NOT_FOUND", `No post ${id} on this instance.`, 404);
     return this.present(post, viewerId, 0, withPendingNotes);
   }

@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { verificationPresentation, type VerificationType } from "@horizon/shared";
+import { LockIcon, RobotIcon } from "../icons";
 
 /**
  * Badge for a verification tier. Business accounts show the gold badge,
@@ -89,12 +90,18 @@ export function NameWithBadges({
   badgeHref,
   badgeTitle,
   nameHref,
+  isProtected = false,
+  isAutomated = false,
 }: {
   displayName: string;
   verification: VerificationType;
   affiliatedTo?: { username: string; displayName: string; avatarUrl?: string | null } | null;
   className?: string;
   badgeClassName?: string;
+  /** Private account: a lock sits after the name wherever the name appears. */
+  isProtected?: boolean;
+  /** Automated account with an approved manager, marked with a robot. */
+  isAutomated?: boolean;
   /** Makes the badge a link — used on organisations to open their affiliates. */
   badgeHref?: string;
   badgeTitle?: string;
@@ -126,6 +133,24 @@ export function NameWithBadges({
         badge
       )}
       {affiliatedTo ? <AffiliateBadge organisation={affiliatedTo} /> : null}
+      {isProtected ? (
+        <LockIcon
+          className="w-[15px] h-[15px] shrink-0"
+          style={{ color: "var(--color-text-secondary)" }}
+          aria-label="Private account"
+        >
+          <title>Private account</title>
+        </LockIcon>
+      ) : null}
+      {isAutomated ? (
+        <RobotIcon
+          className="w-[15px] h-[15px] shrink-0"
+          style={{ color: "var(--color-text-secondary)" }}
+          aria-label="Automated account"
+        >
+          <title>Automated account</title>
+        </RobotIcon>
+      ) : null}
     </span>
   );
 }
