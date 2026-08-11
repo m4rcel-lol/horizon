@@ -168,7 +168,21 @@ export class AuthService {
       where: { tokenHash: this.hashToken(token) },
       include: {
         user: {
-          select: { id: true, username: true, displayName: true, status: true, loginDisabled: true },
+          select: {
+            id: true,
+            username: true,
+            displayName: true,
+            status: true,
+            loginDisabled: true,
+            // Roles come along on the same round trip. Authorization runs on
+            // every request, so a second query per request would be a real
+            // cost for something the join gives away.
+            roleAssignments: {
+              select: {
+                role: { select: { permissions: { select: { permission: { select: { key: true } } } } } },
+              },
+            },
+          },
         },
       },
     });
@@ -193,8 +207,14 @@ export class AuthService {
         .catch(() => undefined);
     }
 
+    const permissions = new Set<string>();
+    for (const { role } of session.user.roleAssignments) {
+      for (const { permission } of role.permissions) permissions.add(permission.key);
+    }
+
     return {
       sessionId: session.id,
+      permissions,
       user: {
         id: session.user.id,
         username: session.user.username,

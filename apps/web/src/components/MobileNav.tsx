@@ -15,12 +15,18 @@ import {
   ComposeIcon,
 } from "../icons";
 import { useSession } from "../hooks/useSession";
+import { PERMISSIONS } from "@horizon/shared";
 import { Avatar, NameWithBadges } from "./Verification";
 
-/** The four destinations that stay on the bar; everything else is in the drawer. */
+/**
+ * The destinations that stay on the bar; everything else is in the drawer.
+ * Post sits in the middle, where a thumb reaches it, so it is listed here in
+ * position rather than floating over the content.
+ */
 const bottomItems = [
   { to: "/home", label: "Home", icon: HomeIcon },
   { to: "/explore", label: "Search", icon: ExploreIcon },
+  { to: "/home#composer", label: "Post", icon: ComposeIcon, primary: true },
   { to: "/notifications", label: "Notifications", icon: NotificationsIcon },
   { to: "/messages", label: "Messages", icon: MessagesIcon },
 ];
@@ -87,7 +93,9 @@ export function MobileTopBar({ onOpenDrawer }: { onOpenDrawer: () => void }) {
 
 /** Slide-in account and navigation drawer. */
 export function MobileDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const { active, accounts, logout, isAuthenticated } = useSession();
+  const { active, accounts, logout, isAuthenticated, can } = useSession();
+  const canAdminister =
+    can(PERMISSIONS.SETTINGS_VIEW) || can(PERMISSIONS.VERIFICATION_GRANT);
   const navigate = useNavigate();
   const location = useLocation();
   const panel = useRef<HTMLDivElement>(null);
@@ -248,7 +256,7 @@ export function MobileDrawer({ open, onClose }: { open: boolean; onClose: () => 
             <SettingsGearIcon className="w-[24px] h-[24px] shrink-0" />
             Settings and privacy
           </Link>
-          {active?.isAdmin ? (
+          {canAdminister ? (
             <Link
               to="/admin/settings"
               className="flex items-center gap-5 px-4 text-[17px] font-bold"
@@ -342,120 +350,56 @@ export function MobileBottomNav() {
       }}
       aria-label="Primary"
     >
-      <NavLink
-        to="/home"
-        className="flex flex-col items-center justify-center flex-1 relative"
-        style={({ isActive }) => ({
-          minHeight: 53,
-          minWidth: 44,
-          color: isActive ? "var(--color-text)" : "var(--color-text-secondary)",
-        })}
-        aria-label="Home"
-      >
-        {({ isActive }) => (
-          <>
-            <HomeIcon className="w-[26px] h-[26px]" />
-            {isActive ? (
-              <span
-                aria-hidden="true"
-                className="absolute top-0 h-[3px] w-8 rounded-full"
-                style={{ background: "var(--color-primary)" }}
-              />
-            ) : null}
-          </>
-        )}
-      </NavLink>
-
-      <NavLink
-        to="/explore"
-        className="flex flex-col items-center justify-center flex-1 relative"
-        style={({ isActive }) => ({
-          minHeight: 53,
-          minWidth: 44,
-          color: isActive ? "var(--color-text)" : "var(--color-text-secondary)",
-        })}
-        aria-label="Search"
-      >
-        {({ isActive }) => (
-          <>
-            <ExploreIcon className="w-[26px] h-[26px]" />
-            {isActive ? (
-              <span
-                aria-hidden="true"
-                className="absolute top-0 h-[3px] w-8 rounded-full"
-                style={{ background: "var(--color-primary)" }}
-              />
-            ) : null}
-          </>
-        )}
-      </NavLink>
-
-      <Link
-        to="/home#composer"
-        className="flex flex-col items-center justify-center flex-1 relative"
-        style={{ minHeight: 53, minWidth: 44 }}
-        aria-label="Post"
-      >
-        <span
-          className="flex items-center justify-center rounded-full"
-          style={{
-            width: 40,
-            height: 40,
-            background: "var(--color-btn)",
-            color: "var(--color-btn-text)",
-          }}
-        >
-          <ComposeIcon className="w-5 h-5" />
-        </span>
-      </Link>
-
-      <NavLink
-        to="/notifications"
-        className="flex flex-col items-center justify-center flex-1 relative"
-        style={({ isActive }) => ({
-          minHeight: 53,
-          minWidth: 44,
-          color: isActive ? "var(--color-text)" : "var(--color-text-secondary)",
-        })}
-        aria-label="Notifications"
-      >
-        {({ isActive }) => (
-          <>
-            <NotificationsIcon className="w-[26px] h-[26px]" />
-            {isActive ? (
-              <span
-                aria-hidden="true"
-                className="absolute top-0 h-[3px] w-8 rounded-full"
-                style={{ background: "var(--color-primary)" }}
-              />
-            ) : null}
-          </>
-        )}
-      </NavLink>
-
-      <NavLink
-        to="/messages"
-        className="flex flex-col items-center justify-center flex-1 relative"
-        style={({ isActive }) => ({
-          minHeight: 53,
-          minWidth: 44,
-          color: isActive ? "var(--color-text)" : "var(--color-text-secondary)",
-        })}
-        aria-label="Messages"
-      >
-        {({ isActive }) => (
-          <>
-            <MessagesIcon className="w-[26px] h-[26px]" />
-            {isActive ? (
-              <span
-                aria-hidden="true"
-                className="absolute top-0 h-[3px] w-8 rounded-full"
-                style={{ background: "var(--color-primary)" }}
-              />
-            ) : null}
-          </>
-        )}
-      </NavLink>
+      {bottomItems.map(({ to, label, icon: Icon, primary }) =>
+        primary ? (
+          // Post is an action rather than a destination, so it gets the filled
+          // treatment and no active indicator.
+          <Link
+            key={to}
+            to={to}
+            className="flex flex-col items-center justify-center flex-1"
+            style={{ minHeight: 53, minWidth: 44 }}
+            aria-label={label}
+          >
+            <span
+              className="flex items-center justify-center rounded-full"
+              style={{
+                width: 40,
+                height: 40,
+                background: "var(--color-btn)",
+                color: "var(--color-btn-text)",
+              }}
+            >
+              <Icon className="w-5 h-5" />
+            </span>
+          </Link>
+        ) : (
+          <NavLink
+            key={to}
+            to={to}
+            className="flex flex-col items-center justify-center flex-1 relative"
+            style={({ isActive }) => ({
+              minHeight: 53,
+              minWidth: 44,
+              color: isActive ? "var(--color-text)" : "var(--color-text-secondary)",
+            })}
+            aria-label={label}
+          >
+            {({ isActive }) => (
+              <>
+                <Icon className="w-[26px] h-[26px]" />
+                {isActive ? (
+                  <span
+                    aria-hidden="true"
+                    className="absolute top-0 h-[3px] w-8 rounded-full"
+                    style={{ background: "var(--color-primary)" }}
+                  />
+                ) : null}
+              </>
+            )}
+          </NavLink>
+        ),
+      )}
     </nav>
   );
 }

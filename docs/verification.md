@@ -87,11 +87,11 @@ with the badge the affiliation grants it.
 
 Administrators manage all of it at `/admin/verification`.
 
-**Authorization is not enforced yet** — there is no auth module to enforce it
-with, so these routes are currently open. The permission keys they will require
-already exist in `@horizon/shared`: `verification.grant` and
-`verification.revoke` for the tier routes, and organisation ownership for the
-affiliation routes. Do not expose this instance publicly until that lands.
+**These routes are authorized.** Setting a tier needs `verification.grant`, and
+clearing one needs `verification.revoke`. Affiliating an account may only be done
+by the organisation itself or by someone holding `verification.grant`; removing
+an affiliation may also be done by the affiliate leaving. See
+[`authorization.md`](authorization.md).
 
 The account directory is in-memory for now, like instance settings, and is
 written to move to Prisma without changing this surface. The schema is already

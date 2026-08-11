@@ -64,7 +64,6 @@ export interface ApiUser {
   status: "ACTIVE" | "SUSPENDED";
   isSystem: boolean;
   loginDisabled: boolean;
-  isAdmin?: boolean;
   bannerUrl?: string | null;
   followingCount?: number;
   followersCount?: number;
@@ -100,7 +99,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
 export const api = {
   // Auth
-  me: () => request<{ user: ApiUser | null }>("/auth/me"),
+  me: () => request<{ user: ApiUser | null; permissions: string[] }>("/auth/me"),
   login: (identifier: string, password: string, remember = true) =>
     request<{ user: ApiUser }>("/auth/login", {
       method: "POST",
@@ -145,16 +144,18 @@ export const api = {
   listPosts: (author?: string) =>
     request<{ posts: ApiPost[] }>(`/posts${author ? `?author=${encodeURIComponent(author)}` : ""}`),
   getPost: (id: string) => request<{ post: ApiPost }>(`/posts/${encodeURIComponent(id)}`),
-  createPost: (author: string, content: string) =>
-    request<{ post: ApiPost }>("/posts", { method: "POST", body: JSON.stringify({ author, content }) }),
+  // The author is the signed-in account, taken from the session server-side.
+  createPost: (content: string) =>
+    request<{ post: ApiPost }>("/posts", { method: "POST", body: JSON.stringify({ content }) }),
 
   listNotes: (postId?: string) =>
     request<{ notes: ApiNote[] }>(`/notes${postId ? `?postId=${encodeURIComponent(postId)}` : ""}`),
   notesForPost: (postId: string) =>
     request<{ notes: ApiNote[] }>(`/notes?postId=${encodeURIComponent(postId)}&visible=true`),
-  rateNote: (id: string, helpful: boolean, rater?: string) =>
+  // Likewise the rater: one signed-in account is one rating.
+  rateNote: (id: string, helpful: boolean) =>
     request<{ note: ApiNote }>(`/notes/${encodeURIComponent(id)}/ratings`, {
       method: "POST",
-      body: JSON.stringify({ helpful, rater }),
+      body: JSON.stringify({ helpful }),
     }),
 };

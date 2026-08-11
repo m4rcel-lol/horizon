@@ -20,6 +20,8 @@ import { LoginPage } from "./pages/LoginPage";
 import { RegisterPage } from "./pages/RegisterPage";
 import { AdminSettingsPage } from "./pages/AdminSettingsPage";
 import { AdminVerificationPage } from "./pages/AdminVerificationPage";
+import { RequirePermission } from "./components/RequirePermission";
+import { PERMISSIONS } from "@horizon/shared";
 import { PrivacyPage } from "./pages/PrivacyPage";
 import { TermsPage } from "./pages/TermsPage";
 import { DocsPage, DocsIndex, DocArticle } from "./pages/DocsPage";
@@ -46,8 +48,22 @@ export default function App() {
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
       <Route path="/setup" element={<SetupPage />} />
-      <Route path="/admin/settings" element={<AdminSettingsPage />} />
-      <Route path="/admin/verification" element={<AdminVerificationPage />} />
+      <Route
+        path="/admin/settings"
+        element={
+          <RequirePermission permission={PERMISSIONS.SETTINGS_VIEW}>
+            <AdminSettingsPage />
+          </RequirePermission>
+        }
+      />
+      <Route
+        path="/admin/verification"
+        element={
+          <RequirePermission permission={PERMISSIONS.VERIFICATION_GRANT}>
+            <AdminVerificationPage />
+          </RequirePermission>
+        }
+      />
 
       {/* Standalone legal / documentation pages — no main nav chrome */}
       <Route path="/about" element={<AboutPage />} />

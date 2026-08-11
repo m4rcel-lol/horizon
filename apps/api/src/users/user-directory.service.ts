@@ -46,7 +46,6 @@ export interface PresentedUser {
   status: AccountStatus;
   isSystem: boolean;
   loginDisabled: boolean;
-  isAdmin: boolean;
   followingCount: number;
   followersCount: number;
   createdAt: string;
@@ -232,23 +231,10 @@ export class UserDirectoryService implements OnModuleInit {
       status: user.status === "SUSPENDED" ? "SUSPENDED" : "ACTIVE",
       isSystem: user.isSystem,
       loginDisabled: user.loginDisabled,
-      isAdmin: await this.userIsAdmin(user.id),
       followingCount,
       followersCount,
       createdAt: user.createdAt.toISOString(),
     };
-  }
-
-  /** True when the account holds an administrator or owner role. */
-  private async userIsAdmin(userId: string): Promise<boolean> {
-    const row = await this.prisma.userRole.findFirst({
-      where: {
-        userId,
-        role: { name: { in: ["administrator", "owner", "admin"] } },
-      },
-      select: { userId: true },
-    });
-    return Boolean(row);
   }
 
   async list(): Promise<PresentedUser[]> {

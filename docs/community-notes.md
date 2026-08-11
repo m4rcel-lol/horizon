@@ -59,10 +59,10 @@ the server. Clearing the account directory re-seeds it rather than removing it.
 Readers see helpful notes on the post at `/:username/status/:postId`, and the
 full picture — including pending and rejected notes — at `/notes`.
 
-**Authorization is not enforced yet.** There is no auth module, so writing and
-rating are currently open and the rater identity comes from the request body.
-When auth lands both require an authenticated contributor and the rater must
-come from the session instead.
+**Writing a note and rating one both need a session**, and the author and rater
+come from it rather than from the request body. That matters for the threshold:
+it assumes distinct raters, and a client-supplied name let one reader clear it
+alone. See [`authorization.md`](authorization.md).
 
 Notes are stored in memory for now, like instance settings and the account
 directory, and are written to move to Prisma without changing this surface. The

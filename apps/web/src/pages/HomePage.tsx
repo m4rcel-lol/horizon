@@ -28,7 +28,7 @@ export function HomePage() {
   const [postError, setPostError] = useState<string | null>(null);
 
   const publish = useMutation({
-    mutationFn: (content: string) => api.createPost(active!.username, content),
+    mutationFn: (content: string) => api.createPost(content),
     onSuccess: () => {
       setDraft("");
       setPostError(null);

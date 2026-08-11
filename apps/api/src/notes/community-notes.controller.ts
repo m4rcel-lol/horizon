@@ -3,6 +3,8 @@ import { IsBoolean, IsIn, IsOptional, IsString, IsUrl, Length } from "class-vali
 import { COMMUNITY_NOTE_CLASSIFICATIONS, type CommunityNoteClassification } from "@horizon/shared";
 import { CommunityNotesService } from "./community-notes.service";
 import { DirectoryError } from "../users/user-directory.service";
+import { CurrentUser, Public } from "../auth/auth.decorators";
+import type { AuthenticatedUser } from "../auth/authenticated-user";
 
 class CreateNoteDto {
   @IsString()
@@ -20,29 +22,20 @@ class CreateNoteDto {
   @IsOptional()
   @IsUrl({ require_tld: false })
   sourceUrl?: string;
-
-  @IsOptional()
-  @IsString()
-  @Length(1, 20)
-  author?: string;
 }
 
 class RateNoteDto {
   @IsBoolean()
   helpful!: boolean;
-
-  @IsOptional()
-  @IsString()
-  @Length(1, 40)
-  rater?: string;
 }
 
 /**
  * Community Notes.
  *
- * Authorization is not enforced yet — there is no auth module. When it lands,
- * writing a note and rating one both require an authenticated contributor, and
- * the rater identity must come from the session rather than the request body.
+ * Reading is open; writing a note and rating one need a session, and both
+ * identities come from it. The rater in particular used to come from the
+ * request body, so a single reader could clear the helpfulness threshold on
+ * their own by sending a fresh name each time.
  */
 @Controller("notes")
 export class CommunityNotesController {
@@ -60,6 +53,7 @@ export class CommunityNotesController {
   }
 
   /** All notes, or those for one post. `visible=true` returns only helpful ones. */
+  @Public()
   @Get()
   list(@Query("postId") postId?: string, @Query("visible") visible?: string) {
     const notes = visible === "true" && postId ? this.notes.forPost(postId) : this.notes.list(postId);
@@ -67,19 +61,19 @@ export class CommunityNotesController {
   }
 
   @Post()
-  create(@Body() body: CreateNoteDto) {
-    return this.unwrap(() => ({ note: this.notes.create(body) }));
+  create(@Body() body: CreateNoteDto, @CurrentUser() auth: AuthenticatedUser) {
+    return this.unwrap(() => ({ note: this.notes.create({ ...body, author: auth.username }) }));
   }
 
+  @Public()
   @Get(":id")
   get(@Param("id") id: string) {
     return this.unwrap(() => ({ note: this.notes.get(id) }));
   }
 
+  /** One account, one rating: rating again replaces the previous one. */
   @Post(":id/ratings")
-  rate(@Param("id") id: string, @Body() body: RateNoteDto) {
-    return this.unwrap(() => ({
-      note: this.notes.rate(id, body.rater ?? "anonymous", body.helpful),
-    }));
+  rate(@Param("id") id: string, @Body() body: RateNoteDto, @CurrentUser() auth: AuthenticatedUser) {
+    return this.unwrap(() => ({ note: this.notes.rate(id, auth.id, body.helpful) }));
   }
 }

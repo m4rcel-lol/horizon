@@ -17,6 +17,8 @@ time and removed afterwards. Nothing here ships in the product.
 | [`verification-and-affiliation/`](verification-and-affiliation) | An organisation's affiliates list and the admin verification console |
 | [`community-notes/`](community-notes) | Every note grouped by whether readers accepted it |
 | [`app/`](app) | The rest of the interface: explore, notifications, messages, bookmarks, lists, communities, about, sign-in, register, first-run setup, instance settings |
+| [`authorization/`](authorization) | The same pages seen by an administrator, an ordinary account and a signed-out visitor, showing what each is allowed to reach |
+| [`ux-fixes/`](ux-fixes) | The profile avatar sitting over the banner, the five-item mobile bottom bar, the account switcher on both layouts, and the Admin Panel entry appearing only for an administrator |
 
 ### Worth looking at first
 

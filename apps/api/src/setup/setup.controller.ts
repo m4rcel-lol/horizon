@@ -1,5 +1,9 @@
 import { Body, Controller, Get, Post } from "@nestjs/common";
+import { PERMISSIONS } from "@horizon/shared";
 import { InstanceSettingsService } from "../instance/instance-settings.service";
+import { PrismaService } from "../database/prisma.service";
+import { CurrentUser, Public } from "../auth/auth.decorators";
+import { assertPermission, type AuthenticatedUser } from "../auth/authenticated-user";
 
 /**
  * First-run setup. Disabled after setup.completed = true
@@ -7,8 +11,13 @@ import { InstanceSettingsService } from "../instance/instance-settings.service";
  */
 @Controller("setup")
 export class SetupController {
-  constructor(private readonly settings: InstanceSettingsService) {}
+  constructor(
+    private readonly settings: InstanceSettingsService,
+    private readonly prisma: PrismaService,
+  ) {}
 
+  /** The web shell asks this before rendering, signed out, to decide what to show. */
+  @Public()
   @Get()
   status() {
     const completed = Boolean(this.settings.get("setup.completed"));
@@ -21,6 +30,13 @@ export class SetupController {
     };
   }
 
+  /**
+   * Completing setup writes storage and SMTP credentials, so it cannot stay
+   * open once the instance has occupants. On a genuinely empty instance there
+   * is nobody who could hold a permission yet, which is the one moment this
+   * has to run unauthenticated; after that it is an administrator action.
+   */
+  @Public()
   @Post()
   async complete(
     @Body()
@@ -29,9 +45,12 @@ export class SetupController {
       instanceDescription?: string;
       storage?: Record<string, unknown>;
       email?: Record<string, unknown>;
-      // owner account fields handled when auth is implemented
     },
+    @CurrentUser() auth: AuthenticatedUser | null,
   ) {
+    const occupants = await this.prisma.user.count({ where: { isSystem: false } });
+    if (occupants > 0) assertPermission(auth, PERMISSIONS.SETTINGS_EDIT);
+
     if (Boolean(this.settings.get("setup.completed"))) {
       return {
         error: {
