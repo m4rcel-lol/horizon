@@ -381,7 +381,7 @@ export class CommunitiesService {
   ): Promise<{ ok: true }> {
     const community = await this.prisma.community.findUnique({
       where: { slug },
-      select: { id: true, ownerId: true },
+      select: { id: true, ownerId: true, slug: true, name: true },
     });
     if (!community) throw new DirectoryError("COMMUNITY_NOT_FOUND", `No community ${slug}.`, 404);
     if (community.ownerId !== actorId) {
@@ -421,6 +421,21 @@ export class CommunitiesService {
             type: "COMMUNITY",
             communityId: community.id,
             actorId: request.userId,
+          },
+        });
+        // Tell the person who asked. Without this they are silently let in and
+        // have to go back and check the community to find out.
+        await tx.notification.create({
+          data: {
+            recipientId: request.userId,
+            actorId,
+            type: "COMMUNITY",
+            communityId: community.id,
+            data: {
+              kind: "JOIN_APPROVED",
+              communitySlug: community.slug,
+              communityName: community.name,
+            },
           },
         });
       });

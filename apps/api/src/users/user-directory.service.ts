@@ -572,6 +572,31 @@ export class UserDirectoryService implements OnModuleInit {
         data: { automatedById: null, automatedPending: false },
       });
     }
+
+    try {
+      // The manager's "wants you to manage this account" row has been answered,
+      // so it should stop sitting in their list as though it were still open.
+      await this.prisma.notification.deleteMany({
+        where: {
+          recipientId: managerId,
+          actorId: automated.id,
+          type: "SYSTEM",
+        },
+      });
+      // And the account that asked hears back either way — an unanswered
+      // request is indistinguishable from a declined one otherwise.
+      await this.prisma.notification.create({
+        data: {
+          recipientId: automated.id,
+          actorId: managerId,
+          type: "SYSTEM",
+          data: { kind: approve ? "AUTOMATION_ACCEPTED" : "AUTOMATION_DECLINED" },
+        },
+      });
+    } catch {
+      /* non-fatal */
+    }
+
     return this.get(automatedUsername);
   }
 

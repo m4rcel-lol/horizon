@@ -1,7 +1,18 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { LikeIcon, RepostIcon, ReplyIcon, QuoteIcon, ProfileIcon, CommunitiesIcon } from "../icons";
+import {
+  LikeIcon,
+  RepostIcon,
+  ReplyIcon,
+  QuoteIcon,
+  ProfileIcon,
+  CommunitiesIcon,
+  MessagesIcon,
+  NoteIcon,
+  NotificationsIcon,
+  RobotIcon,
+} from "../icons";
 import { api, type ApiNotification } from "../api";
 import { Avatar, NameWithBadges } from "../components/Verification";
 import { useSession } from "../hooks/useSession";
@@ -12,8 +23,18 @@ const filters = [
   { id: "mentions", label: "Mentions" },
 ] as const;
 
-/** Icon and wording per kind, so a row reads as a sentence. */
-function describe(n: ApiNotification) {
+/**
+ * Icon and wording per notification, so a row reads as a sentence.
+ *
+ * The switch is exhaustive over ApiNotificationType, and the default arm
+ * assigns `n.type` to `never`: adding a type on the server without a case here
+ * fails the build. That check is the point of this function — a missing case
+ * used to fall through to "did something", which is what every unhandled
+ * notification silently rendered as.
+ */
+function describe(n: ApiNotification): { Icon: typeof LikeIcon; colour: string; text: ReactNode } {
+  const community = n.community?.name;
+
   switch (n.type) {
     case "LIKE":
       return { Icon: LikeIcon, colour: "var(--color-danger, #f91880)", text: "liked your post" };
@@ -27,10 +48,55 @@ function describe(n: ApiNotification) {
       return { Icon: QuoteIcon, colour: "var(--color-primary)", text: "mentioned you" };
     case "FOLLOW":
       return { Icon: ProfileIcon, colour: "var(--color-primary)", text: "followed you" };
+    case "FOLLOW_REQUEST":
+      return { Icon: ProfileIcon, colour: "var(--color-primary)", text: "asked to follow you" };
+    case "DM":
+      return { Icon: MessagesIcon, colour: "var(--color-primary)", text: "sent you a message" };
     case "COMMUNITY":
-      return { Icon: CommunitiesIcon, colour: "var(--color-primary)", text: "wants to join your community" };
-    default:
-      return { Icon: ProfileIcon, colour: "var(--color-primary)", text: "did something" };
+      if (n.kind === "JOIN_APPROVED") {
+        return {
+          Icon: CommunitiesIcon,
+          colour: "var(--color-success, #00ba7c)",
+          text: community ? <>accepted your request to join {community}</> : "accepted your request to join",
+        };
+      }
+      return {
+        Icon: CommunitiesIcon,
+        colour: "var(--color-primary)",
+        text: community ? <>asked to join {community}</> : "asked to join your community",
+      };
+    case "MODERATION":
+      return { Icon: NoteIcon, colour: "var(--color-primary)", text: "sent a moderation update" };
+    case "SYSTEM":
+      switch (n.kind) {
+        case "AUTOMATION_REQUEST":
+          return {
+            Icon: RobotIcon,
+            colour: "var(--color-primary)",
+            text: "asked you to manage their automated account",
+          };
+        case "AUTOMATION_ACCEPTED":
+          return {
+            Icon: RobotIcon,
+            colour: "var(--color-success, #00ba7c)",
+            text: "now manages this automated account",
+          };
+        case "AUTOMATION_DECLINED":
+          return {
+            Icon: RobotIcon,
+            colour: "var(--color-text-secondary)",
+            text: "declined managing this account",
+          };
+        default:
+          return { Icon: NotificationsIcon, colour: "var(--color-primary)", text: "sent you an update" };
+      }
+    default: {
+      // Exhaustiveness: this line stops compiling the moment a type is added
+      // to ApiNotificationType without an arm above.
+      const unhandled: never = n.type;
+      void unhandled;
+      return { Icon: NotificationsIcon, colour: "var(--color-primary)", text: "sent you an update" };
+    }
   }
 }
 
@@ -112,13 +178,10 @@ export function NotificationsPage() {
           {notifications.map((n) => {
             const { Icon, colour, text } = describe(n);
             const handle = n.actor?.username;
-            const to =
-              (n as { href?: string | null }).href ||
-              (n.postId
-                ? `/${n.actor?.username ?? "i"}/status/${n.postId}`
-                : handle
-                  ? `/${handle}`
-                  : "/home");
+            // The server sends the destination whenever the row has one that
+            // is not simply the actor's profile — including post permalinks,
+            // which it can build correctly because it knows the post's author.
+            const to = n.href || (handle ? `/${handle}` : "/notifications");
             return (
               <li key={n.id}>
                 <Link
