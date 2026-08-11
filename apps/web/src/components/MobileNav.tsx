@@ -16,6 +16,8 @@ import {
 } from "../icons";
 import { useSession } from "../hooks/useSession";
 import { PERMISSIONS } from "@horizon/shared";
+import { useQuery } from "@tanstack/react-query";
+import { api } from "../api";
 import { Avatar, NameWithBadges } from "./Verification";
 
 /**
@@ -340,6 +342,16 @@ export function MobileDrawer({ open, onClose }: { open: boolean; onClose: () => 
  * bar padded for the home-indicator area on modern phones.
  */
 export function MobileBottomNav() {
+  const { isAuthenticated } = useSession();
+  const { data: unread } = useQuery({
+    queryKey: ["unread-notifications"],
+    queryFn: api.unreadNotifications,
+    enabled: isAuthenticated,
+    refetchInterval: 60_000,
+    retry: false,
+  });
+  const unreadCount = unread?.count ?? 0;
+
   return (
     <nav
       className="md:hidden fixed bottom-0 inset-x-0 flex justify-around items-stretch border-t z-40"
@@ -387,7 +399,18 @@ export function MobileBottomNav() {
           >
             {({ isActive }) => (
               <>
-                <Icon className="w-[26px] h-[26px]" />
+                <span className="relative">
+                  <Icon className="w-[26px] h-[26px]" />
+                  {to === "/notifications" && unreadCount > 0 ? (
+                    <span
+                      className="absolute -top-1 -right-2 min-w-[17px] h-[17px] px-1 rounded-full text-[10px] font-bold flex items-center justify-center"
+                      style={{ background: "var(--color-primary)", color: "#fff" }}
+                      aria-label={`${unreadCount} unread`}
+                    >
+                      {unreadCount > 99 ? "99+" : unreadCount}
+                    </span>
+                  ) : null}
+                </span>
                 {isActive ? (
                   <span
                     aria-hidden="true"

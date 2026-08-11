@@ -9,7 +9,8 @@ import {
   type CommunityNoteClassification,
   type CommunityNoteStatus,
 } from "@horizon/shared";
-import { DirectoryError } from "../users/user-directory.service";
+import { PrismaService } from "../database/prisma.service";
+import { DirectoryError } from "../users/directory-error";
 
 export interface CommunityNote {
   id: string;
@@ -33,27 +34,62 @@ export interface PresentedNote extends CommunityNote {
   totalRatings: number;
   /** The account that publishes notes, for attribution in the UI. */
   publishedBy: string;
+  /** How the caller rated it, so the buttons show their own vote. */
+  viewerRating: boolean | null;
 }
 
+const NOTE_SELECT = {
+  id: true,
+  postId: true,
+  classification: true,
+  body: true,
+  sourceUrl: true,
+  helpfulCount: true,
+  notHelpfulCount: true,
+  createdAt: true,
+  author: { select: { username: true } },
+} as const;
+
+type NoteRow = {
+  id: string;
+  postId: string;
+  classification: CommunityNoteClassification;
+  body: string;
+  sourceUrl: string | null;
+  helpfulCount: number;
+  notHelpfulCount: number;
+  createdAt: Date;
+  author: { username: string } | null;
+};
+
 /**
- * In-memory Community Notes store.
+ * Community Notes, stored in Postgres.
  *
- * Notes are keyed to a post id; the post itself lives elsewhere (and, for now,
- * nowhere — the posts module is still a placeholder), so nothing here assumes a
- * post exists. Written to move to Prisma without changing this surface; the
- * CommunityNote and CommunityNoteRating models are already in the schema.
+ * This used to be a Map in memory, which meant every note and every rating was
+ * lost when the API restarted — the one thing a system built on accumulated
+ * reader judgement cannot afford.
+ *
+ * `status` is denormalised onto the row so a timeline can filter to visible
+ * notes without recounting ratings for every post it renders. It is recomputed
+ * inside the same transaction as the rating that changed it, so it cannot fall
+ * out of step with the counts.
  */
 @Injectable()
 export class CommunityNotesService {
-  private notes = new Map<string, CommunityNote>();
-  /** noteId -> rater -> helpful. One rating per rater, changeable. */
-  private ratings = new Map<string, Map<string, boolean>>();
-  private seq = 0;
+  constructor(private readonly prisma: PrismaService) {}
 
-  private present(note: CommunityNote): PresentedNote {
+  private present(note: NoteRow, viewerRating: boolean | null = null): PresentedNote {
     const status = communityNoteStatus(note.helpfulCount, note.notHelpfulCount);
     return {
-      ...note,
+      id: note.id,
+      postId: note.postId,
+      author: note.author?.username ?? null,
+      classification: note.classification,
+      body: note.body,
+      sourceUrl: note.sourceUrl,
+      helpfulCount: note.helpfulCount,
+      notHelpfulCount: note.notHelpfulCount,
+      createdAt: note.createdAt.toISOString(),
       status,
       statusLabel: COMMUNITY_NOTE_STATUS_LABELS[status],
       classificationLabel: COMMUNITY_NOTE_CLASSIFICATION_LABELS[note.classification],
@@ -61,82 +97,141 @@ export class CommunityNotesService {
       ratingsNeeded: ratingsUntilRated(note.helpfulCount, note.notHelpfulCount),
       totalRatings: note.helpfulCount + note.notHelpfulCount,
       publishedBy: COMMUNITY_NOTES_ACCOUNT.username,
+      viewerRating,
     };
   }
 
-  private require(id: string): CommunityNote {
-    const note = this.notes.get(id);
-    if (!note) throw new DirectoryError("NOTE_NOT_FOUND", `No note ${id} on this instance.`, 404);
-    return note;
+  /** Attach the caller's own vote to each note in one extra query, not N. */
+  private async withViewerRatings(
+    notes: NoteRow[],
+    viewerId: string | null,
+  ): Promise<PresentedNote[]> {
+    if (!viewerId || notes.length === 0) return notes.map((n) => this.present(n));
+    const mine = await this.prisma.communityNoteRating.findMany({
+      where: { userId: viewerId, noteId: { in: notes.map((n) => n.id) } },
+      select: { noteId: true, helpful: true },
+    });
+    const byNote = new Map(mine.map((r) => [r.noteId, r.helpful]));
+    return notes.map((n) => this.present(n, byNote.get(n.id) ?? null));
   }
 
-  create(input: {
+  async create(input: {
     postId: string;
     body: string;
     classification?: CommunityNoteClassification;
     sourceUrl?: string;
-    author?: string;
-  }): PresentedNote {
-    this.seq += 1;
-    const note: CommunityNote = {
-      id: `note_${Date.now().toString(36)}${this.seq.toString(36)}`,
-      postId: input.postId,
-      author: input.author ?? null,
-      classification: input.classification ?? "MISSING_CONTEXT",
-      body: input.body,
-      sourceUrl: input.sourceUrl ?? null,
-      helpfulCount: 0,
-      notHelpfulCount: 0,
-      createdAt: new Date().toISOString(),
-    };
-    this.notes.set(note.id, note);
-    this.ratings.set(note.id, new Map());
+    authorId?: string | null;
+  }): Promise<PresentedNote> {
+    // The note is a foreign key onto the post now, so a note about nothing is
+    // rejected rather than stored and never displayed.
+    const post = await this.prisma.post.findFirst({
+      where: { id: input.postId, deletedAt: null },
+      select: { id: true },
+    });
+    if (!post) {
+      throw new DirectoryError("POST_NOT_FOUND", `No post ${input.postId} on this instance.`, 404);
+    }
+
+    const note = (await this.prisma.communityNote.create({
+      data: {
+        postId: input.postId,
+        authorId: input.authorId ?? null,
+        classification: input.classification ?? "MISSING_CONTEXT",
+        body: input.body,
+        sourceUrl: input.sourceUrl ?? null,
+        status: communityNoteStatus(0, 0),
+      },
+      select: NOTE_SELECT,
+    })) as NoteRow;
     return this.present(note);
   }
 
-  get(id: string): PresentedNote {
-    return this.present(this.require(id));
+  async get(id: string, viewerId: string | null = null): Promise<PresentedNote> {
+    const note = (await this.prisma.communityNote.findUnique({
+      where: { id },
+      select: NOTE_SELECT,
+    })) as NoteRow | null;
+    if (!note) throw new DirectoryError("NOTE_NOT_FOUND", `No note ${id} on this instance.`, 404);
+    const [presented] = await this.withViewerRatings([note], viewerId);
+    return presented;
   }
 
   /** Every note, newest first, optionally for one post. */
-  list(postId?: string): PresentedNote[] {
-    return [...this.notes.values()]
-      .filter((n) => !postId || n.postId === postId)
-      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
-      .map((n) => this.present(n));
+  async list(postId?: string, viewerId: string | null = null): Promise<PresentedNote[]> {
+    const notes = (await this.prisma.communityNote.findMany({
+      where: postId ? { postId } : {},
+      orderBy: { createdAt: "desc" },
+      take: 200,
+      select: NOTE_SELECT,
+    })) as NoteRow[];
+    return this.withViewerRatings(notes, viewerId);
   }
 
-  /** Notes shown on a post — helpful ones only. */
-  forPost(postId: string): PresentedNote[] {
-    return this.list(postId).filter((n) => n.visibleOnPost);
+  /**
+   * Notes shown on a post — helpful ones only.
+   *
+   * Filtered on the stored status in the query rather than by loading every
+   * note and recomputing, because this runs once per post in a timeline.
+   */
+  async forPost(postId: string, viewerId: string | null = null): Promise<PresentedNote[]> {
+    const notes = (await this.prisma.communityNote.findMany({
+      where: { postId, status: "HELPFUL" },
+      orderBy: { createdAt: "desc" },
+      select: NOTE_SELECT,
+    })) as NoteRow[];
+    return this.withViewerRatings(notes, viewerId);
   }
 
   /**
    * Rate a note. A rater has one vote per note and may change it; re-sending
    * the same verdict is a no-op rather than a second vote.
    */
-  rate(id: string, rater: string, helpful: boolean): PresentedNote {
-    const note = this.require(id);
-    const byRater = this.ratings.get(note.id) ?? new Map<string, boolean>();
-    const previous = byRater.get(rater);
+  async rate(id: string, userId: string, helpful: boolean): Promise<PresentedNote> {
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const note = await tx.communityNote.findUnique({
+        where: { id },
+        select: { id: true, helpfulCount: true, notHelpfulCount: true },
+      });
+      if (!note) throw new DirectoryError("NOTE_NOT_FOUND", `No note ${id} on this instance.`, 404);
 
-    if (previous === helpful) return this.present(note);
+      const previous = await tx.communityNoteRating.findUnique({
+        where: { noteId_userId: { noteId: id, userId } },
+        select: { helpful: true },
+      });
+      if (previous?.helpful === helpful) return null;
 
-    if (previous === true) note.helpfulCount -= 1;
-    if (previous === false) note.notHelpfulCount -= 1;
-    if (helpful) note.helpfulCount += 1;
-    else note.notHelpfulCount += 1;
+      let { helpfulCount, notHelpfulCount } = note;
+      if (previous?.helpful === true) helpfulCount -= 1;
+      if (previous?.helpful === false) notHelpfulCount -= 1;
+      if (helpful) helpfulCount += 1;
+      else notHelpfulCount += 1;
 
-    byRater.set(rater, helpful);
-    this.ratings.set(note.id, byRater);
-    return this.present(note);
+      await tx.communityNoteRating.upsert({
+        where: { noteId_userId: { noteId: id, userId } },
+        update: { helpful },
+        create: { noteId: id, userId, helpful },
+      });
+
+      // Recomputed here, in the same transaction, so the stored status the
+      // timeline filters on always matches the counts it was derived from.
+      return (await tx.communityNote.update({
+        where: { id },
+        data: {
+          helpfulCount,
+          notHelpfulCount,
+          status: communityNoteStatus(helpfulCount, notHelpfulCount),
+        },
+        select: NOTE_SELECT,
+      })) as NoteRow;
+    });
+
+    if (!updated) return this.get(id, userId);
+    return this.present(updated, helpful);
   }
 
-  /** Wipe notes — used by tests and by operators clearing demo data. */
-  reset() {
-    const removed = this.notes.size;
-    this.notes.clear();
-    this.ratings.clear();
-    return { removed };
+  /** Wipe notes — used by operators clearing demo data. */
+  async reset() {
+    const { count } = await this.prisma.communityNote.deleteMany({});
+    return { removed: count };
   }
 }

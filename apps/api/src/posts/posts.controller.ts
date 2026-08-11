@@ -1,9 +1,10 @@
-import { Body, Controller, Get, HttpException, Param, Post, Put, Query } from "@nestjs/common";
+import { Body, Controller, Delete, Get, HttpException, Param, Post, Put, Query } from "@nestjs/common";
 import { IsBoolean, IsOptional, IsString, Length } from "class-validator";
 import { PostsService } from "./posts.service";
 import { DirectoryError } from "../users/user-directory.service";
 import { CurrentUser, Public } from "../auth/auth.decorators";
-import type { AuthenticatedUser } from "../auth/authenticated-user";
+import { has, type AuthenticatedUser } from "../auth/authenticated-user";
+import { PERMISSIONS } from "@horizon/shared";
 
 class CreatePostDto {
   @IsString()
@@ -57,6 +58,12 @@ export class PostsController {
     return { posts: await this.posts.list(author, auth?.id ?? null) };
   }
 
+  /** Chronological, only the accounts you follow. */
+  @Get("following")
+  async following(@CurrentUser() auth: AuthenticatedUser) {
+    return { posts: await this.posts.following(auth.id) };
+  }
+
   @Post()
   async create(@Body() body: CreatePostDto, @CurrentUser() auth: AuthenticatedUser) {
     return this.unwrap(async () => ({
@@ -93,6 +100,14 @@ export class PostsController {
     @CurrentUser() auth: AuthenticatedUser,
   ) {
     return this.unwrap(async () => ({ post: await this.posts.setLike(id, auth.id, body.on) }));
+  }
+
+  /** The author may delete their own; a moderator may delete anyone's. */
+  @Delete(":id")
+  async remove(@Param("id") id: string, @CurrentUser() auth: AuthenticatedUser) {
+    return this.unwrap(() =>
+      this.posts.remove(id, auth.id, has(auth, PERMISSIONS.POSTS_DELETE)),
+    );
   }
 
   @Put(":id/repost")

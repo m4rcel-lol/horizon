@@ -1,4 +1,4 @@
-import { Injectable, OnModuleInit } from "@nestjs/common";
+import { Injectable, Logger, OnModuleInit } from "@nestjs/common";
 import {
   DEFAULT_INSTANCE_SETTINGS,
   InstanceSettingKey,
@@ -10,36 +10,62 @@ import {
   type EmailConfig,
   type EnvConfig,
 } from "@horizon/config";
+import { PrismaService } from "../database/prisma.service";
 
 /**
  * Central instance settings service.
  *
  * - Defaults from code
- * - Overrides from database (instance_settings table)
+ * - Overrides from the instance_setting table
  * - Env still wins for storage/SMTP when set
  *
- * In production this service would use Prisma + Redis cache.
- * This implementation keeps an in-memory store for the foundation phase
- * and is designed to swap to Prisma without changing the public API.
+ * The stored values are mirrored in memory because they are read on nearly
+ * every request (branding, registration mode, resolved storage config) and
+ * they change only when an administrator saves the settings form. Writes go to
+ * Postgres first and update the mirror afterwards, so a failed write cannot
+ * leave the process believing something was saved that was not.
+ *
+ * Until this landed the map *was* the store: the admin panel reported success
+ * and the values were gone at the next restart.
  */
 @Injectable()
 export class InstanceSettingsService implements OnModuleInit {
   private cache = new Map<string, unknown>();
+  private readonly logger = new Logger(InstanceSettingsService.name);
   private env: EnvConfig;
 
-  constructor() {
+  constructor(private readonly prisma: PrismaService) {
     this.env = loadEnvSafe();
   }
 
-  onModuleInit() {
+  async onModuleInit() {
     // Seed defaults
     for (const [key, value] of Object.entries(DEFAULT_INSTANCE_SETTINGS)) {
       if (!this.cache.has(key)) {
         this.cache.set(key, value);
       }
     }
+    await this.loadFromDatabase();
     // Reflect env-based configured flags
     this.refreshDerivedFlags();
+  }
+
+  /** Stored values win over the compiled defaults. */
+  private async loadFromDatabase() {
+    try {
+      const rows = await this.prisma.instanceSetting.findMany({
+        select: { key: true, value: true },
+      });
+      for (const row of rows) {
+        // Stored as JSON, so a boolean stays a boolean and a number a number.
+        this.cache.set(row.key, row.value as unknown);
+      }
+      this.logger.log(`Loaded ${rows.length} stored instance setting(s)`);
+    } catch (error) {
+      // A first run before `migrate deploy` has finished should not stop the
+      // API from booting on its defaults.
+      this.logger.warn(`Could not read stored instance settings: ${error}`);
+    }
   }
 
   /** Load all settings (secrets redacted unless includeSecrets). */
@@ -74,6 +100,7 @@ export class InstanceSettingsService implements OnModuleInit {
     partial: Record<string, unknown>,
     actorId?: string,
   ): Promise<Record<string, unknown>> {
+    const writes = new Map<string, unknown>();
     for (const [key, value] of Object.entries(partial)) {
       if (!(key in DEFAULT_INSTANCE_SETTINGS) && !key.startsWith("storage.") && !key.startsWith("email.") && !key.startsWith("instance.") && !key.startsWith("registration.") && !key.startsWith("posts.") && !key.startsWith("media.") && !key.startsWith("timeline.") && !key.startsWith("moderation.") && !key.startsWith("federation.") && !key.startsWith("security.") && !key.startsWith("analytics.") && !key.startsWith("setup.")) {
         // Allow known prefixes; skip unknown
@@ -85,10 +112,22 @@ export class InstanceSettingsService implements OnModuleInit {
           continue;
         }
       }
-      this.cache.set(key, value);
-      // TODO: persist to Prisma instance_settings + audit log (actorId)
-      void actorId;
+      writes.set(key, value);
     }
+
+    // Written before the mirror is touched: if this throws, the caller gets an
+    // error and the process has not started reporting an unsaved value.
+    await this.prisma.$transaction(
+      [...writes].map(([key, value]) =>
+        this.prisma.instanceSetting.upsert({
+          where: { key },
+          update: { value: value as never, updatedBy: actorId ?? null },
+          create: { key, value: value as never, updatedBy: actorId ?? null },
+        }),
+      ),
+    );
+
+    for (const [key, value] of writes) this.cache.set(key, value);
     this.refreshDerivedFlags();
     return this.getAll(false);
   }
