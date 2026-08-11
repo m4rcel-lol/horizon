@@ -107,7 +107,7 @@ export function CommunityPage() {
             </div>
             <h2 className="mt-3 text-[20px] font-extrabold inline-flex items-center gap-1.5">
               {community.name}
-              {community.verification === "INDIVIDUAL" ? (
+              {community.verification === "STANDARD" ? (
                 <img
                   src="/assets/verified.svg"
                   alt="Verified"
@@ -185,14 +185,14 @@ function CommunitySettingsModal({
   avatarUrl?: string | null;
   bannerUrl?: string | null;
   joinMode?: "OPEN" | "REQUEST";
-  verification?: "NONE" | "INDIVIDUAL";
+  verification?: "NONE" | "STANDARD";
   onClose: () => void;
   onSaved: () => void;
 }) {
   const [avatar, setAvatar] = useState(avatarUrl ?? "");
   const [banner, setBanner] = useState(bannerUrl ?? "");
   const [joinMode, setJoinMode] = useState<"OPEN" | "REQUEST">(initialJoinMode);
-  const [verification, setVerification] = useState<"NONE" | "INDIVIDUAL">(initialVerification);
+  const [verification, setVerification] = useState<"NONE" | "STANDARD">(initialVerification);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -272,7 +272,7 @@ function CommunitySettingsModal({
           {(
             [
               { value: "NONE" as const, label: "Not verified" },
-              { value: "INDIVIDUAL" as const, label: "Verified (blue badge)" },
+              { value: "STANDARD" as const, label: "Verified (blue badge)" },
             ] as const
           ).map((opt) => (
             <label

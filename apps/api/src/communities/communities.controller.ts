@@ -44,8 +44,8 @@ class UpdateCommunityDto {
 
   /** Communities may only use the normal (blue) badge, or none. */
   @IsOptional()
-  @IsIn(["NONE", "INDIVIDUAL"])
-  verification?: "NONE" | "INDIVIDUAL";
+  @IsIn(["NONE", "STANDARD"])
+  verification?: "NONE" | "STANDARD";
 }
 
 class ResolveRequestDto {

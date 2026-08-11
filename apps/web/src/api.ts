@@ -71,7 +71,7 @@ export interface ApiCommunity {
   bannerUrl?: string | null;
   memberCount: number;
   joinMode?: "OPEN" | "REQUEST";
-  verification?: "NONE" | "INDIVIDUAL";
+  verification?: "NONE" | "STANDARD";
   owner: { username: string; displayName: string };
   joinedByViewer: boolean;
   pendingRequestByViewer?: boolean;
@@ -314,7 +314,7 @@ export const api = {
       bannerUrl?: string | null;
       description?: string;
       joinMode?: "OPEN" | "REQUEST";
-      verification?: "NONE" | "INDIVIDUAL";
+      verification?: "NONE" | "STANDARD";
     },
   ) =>
     request<{ community: ApiCommunity }>(`/communities/${encodeURIComponent(slug)}`, {

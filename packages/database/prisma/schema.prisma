@@ -708,7 +708,7 @@ model Community {
   bannerUrl    String?
   visibility   CommunityVisibility  @default(PUBLIC)
   joinMode     CommunityJoinMode    @default(OPEN)
-  /// Only NONE or INDIVIDUAL (the normal blue badge) are allowed for communities.
+  /// Only NONE or STANDARD (the normal blue badge) are allowed for communities.
   verification VerificationType     @default(NONE)
   memberCount  Int                  @default(0)
   postCount    Int                  @default(0)

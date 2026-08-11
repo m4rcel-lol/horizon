@@ -14,8 +14,8 @@ export interface PresentedCommunity {
   bannerUrl: string | null;
   memberCount: number;
   joinMode: CommunityJoinMode;
-  /** Only NONE or INDIVIDUAL for communities. */
-  verification: "NONE" | "INDIVIDUAL";
+  /** Only NONE or STANDARD for communities. */
+  verification: "NONE" | "STANDARD";
   owner: { username: string; displayName: string };
   joinedByViewer: boolean;
   /** Viewer has a pending join request (REQUEST mode). */
@@ -73,8 +73,8 @@ export class CommunitiesService {
     joined: boolean,
     pendingRequest: boolean,
   ): PresentedCommunity {
-    const verification: "NONE" | "INDIVIDUAL" =
-      row.verification === "INDIVIDUAL" ? "INDIVIDUAL" : "NONE";
+    const verification: "NONE" | "STANDARD" =
+      row.verification === "STANDARD" ? "STANDARD" : "NONE";
     return {
       id: row.id,
       slug: row.slug,
@@ -305,7 +305,7 @@ export class CommunitiesService {
       bannerUrl?: string | null;
       description?: string;
       joinMode?: CommunityJoinMode;
-      verification?: "NONE" | "INDIVIDUAL";
+      verification?: "NONE" | "STANDARD";
     },
   ): Promise<PresentedCommunity> {
     const community = await this.prisma.community.findUnique({
@@ -316,7 +316,7 @@ export class CommunitiesService {
     if (community.ownerId !== actorId) {
       throw new DirectoryError("FORBIDDEN", "Only the owner can edit this community.", 403);
     }
-    if (changes.verification !== undefined && changes.verification !== "NONE" && changes.verification !== "INDIVIDUAL") {
+    if (changes.verification !== undefined && changes.verification !== "NONE" && changes.verification !== "STANDARD") {
       throw new DirectoryError(
         "INVALID_VERIFICATION",
         "Communities may only use the normal (blue) verification badge, or none.",

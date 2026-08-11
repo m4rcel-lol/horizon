@@ -514,6 +514,19 @@ export class UserDirectoryService implements OnModuleInit {
     return this.get(username);
   }
 
+
+  /** True when the account holds an administrator or owner role. */
+  private async userIsAdmin(userId: string): Promise<boolean> {
+    const row = await this.prisma.userRole.findFirst({
+      where: {
+        userId,
+        role: { name: { in: ["administrator", "owner"] } },
+      },
+      select: { userId: true },
+    });
+    return Boolean(row);
+  }
+
   private async record(
     userId: string,
     fromType: VerificationType,
