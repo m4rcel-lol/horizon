@@ -1,10 +1,11 @@
-import { useEffect, useRef, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { MediaIcon, PollIcon, EmojiIcon, ScheduleIcon } from "../icons";
-import { api, ApiError } from "../api";
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { api } from "../api";
 import { useSession } from "../hooks/useSession";
 import { Link } from "react-router-dom";
 import { PostCard } from "../components/PostCard";
+import { PostComposer } from "../components/PostComposer";
+import { TimelineSkeleton } from "../components/LoadingSpinner";
 import { ComposerModal, type ComposerTarget } from "../components/ComposerModal";
 import type { ApiPost } from "../api";
 
@@ -25,29 +26,9 @@ export function HomePage() {
     enabled: tab === "for-you" || Boolean(active),
   });
   const posts = data?.posts ?? [];
-  const queryClient = useQueryClient();
-  const [draft, setDraft] = useState("");
-  const composerRef = useRef<HTMLTextAreaElement>(null);
-
-  // The rail's Post button links to #composer; focus it on arrival.
-  useEffect(() => {
-    if (window.location.hash === "#composer") composerRef.current?.focus();
-  }, []);
-  const [postError, setPostError] = useState<string | null>(null);
   const [composing, setComposing] = useState<ComposerTarget>(null);
   const openReply = (post: ApiPost) => setComposing({ mode: "reply", post });
   const openQuote = (post: ApiPost) => setComposing({ mode: "quote", post });
-
-  const publish = useMutation({
-    mutationFn: (content: string) => api.createPost(content),
-    onSuccess: () => {
-      setDraft("");
-      setPostError(null);
-      queryClient.invalidateQueries({ queryKey: ["posts"] });
-    },
-    onError: (err) =>
-      setPostError(err instanceof ApiError ? err.message : "Could not publish that. Try again."),
-  });
 
   return (
     <div>
@@ -70,46 +51,8 @@ export function HomePage() {
         ))}
       </div>
 
-      {/* Composer */}
       {active ? (
-      <div className="flex gap-3 px-4 py-3 border-b" style={{ borderColor: "var(--color-border)" }}>
-        <img src={active.avatarUrl || "/assets/default-avatar.svg"} alt="" className="avatar w-10 h-10" />
-        <div className="flex-1 min-w-0">
-          <textarea
-            id="composer"
-            ref={composerRef}
-            rows={2}
-            placeholder="What's happening?"
-            aria-label="Post text"
-            maxLength={500}
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            className="w-full bg-transparent text-[20px] outline-none resize-none placeholder:text-[var(--color-text-secondary)] py-2"
-          />
-          <div className="flex items-center justify-between pt-2">
-            <div className="flex gap-1" style={{ color: "var(--color-primary)" }}>
-              {[MediaIcon, PollIcon, EmojiIcon, ScheduleIcon].map((Icon, i) => (
-                <span key={i} className="icon-btn">
-                  <Icon className="w-5 h-5" />
-                </span>
-              ))}
-            </div>
-            <button
-              type="button"
-              className="btn btn-primary px-4"
-              disabled={!draft.trim() || publish.isPending}
-              onClick={() => publish.mutate(draft.trim())}
-            >
-              {publish.isPending ? "Posting…" : "Post"}
-            </button>
-          </div>
-          {postError ? (
-            <p role="alert" className="text-[14px] mt-1" style={{ color: "var(--color-danger)" }}>
-              {postError}
-            </p>
-          ) : null}
-        </div>
-      </div>
+        <PostComposer />
       ) : (
         <div className="px-4 py-4 border-b flex flex-wrap items-center gap-3" style={{ borderColor: "var(--color-border)" }}>
           <p className="text-[15px] flex-1 min-w-[200px]" style={{ color: "var(--color-text-secondary)" }}>
@@ -121,9 +64,7 @@ export function HomePage() {
       )}
 
       {isLoading ? (
-        <p className="px-4 py-6 text-[15px]" style={{ color: "var(--color-text-secondary)" }}>
-          Loading timeline…
-        </p>
+        <TimelineSkeleton />
       ) : tab === "following" && !active ? (
         <div className="empty-state">
           <h2>Sign in to see your following feed</h2>
@@ -131,8 +72,14 @@ export function HomePage() {
         </div>
       ) : posts.length > 0 ? (
         <ul>
-          {posts.map((post) => (
-            <li key={post.id}>
+          {posts.map((post, i) => (
+            // Staggered, but only for the first handful — past that it is a
+            // delay before you can read anything rather than an effect.
+            <li
+              key={post.id}
+              className="animate-slide-up"
+              style={{ animationDelay: `${Math.min(i, 6) * 35}ms` }}
+            >
               <PostCard post={post} onReply={openReply} onQuote={openQuote} />
             </li>
           ))}

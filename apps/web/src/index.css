@@ -308,8 +308,84 @@ body {
   border-top-color: var(--color-primary);
   animation: horizon-spin 0.7s linear infinite;
 }
+@keyframes horizon-pop-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+@keyframes horizon-slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes horizon-shimmer {
+  from {
+    background-position: -400px 0;
+  }
+  to {
+    background-position: 400px 0;
+  }
+}
+
 .animate-fade-in {
   animation: horizon-fade-in 0.25s ease-out both;
+}
+/* Menus, pickers and lightboxes: they appear at a point, so they scale from it. */
+.animate-pop-in {
+  animation: horizon-pop-in 0.15s ease-out both;
+}
+/* Rows arriving in a list. */
+.animate-slide-up {
+  animation: horizon-slide-up 0.28s cubic-bezier(0.2, 0, 0.2, 1) both;
+}
+
+/*
+ * Skeletons for content that is loading.
+ *
+ * A shape where the content will be, rather than a spinner in the middle of an
+ * empty page: the layout does not jump when the data lands.
+ */
+.skeleton {
+  border-radius: 8px;
+  background: linear-gradient(
+    90deg,
+    var(--color-bg-secondary) 0%,
+    color-mix(in srgb, var(--color-bg-secondary) 55%, var(--color-text-secondary) 12%) 50%,
+    var(--color-bg-secondary) 100%
+  );
+  background-size: 800px 100%;
+  animation: horizon-shimmer 1.4s linear infinite;
+}
+
+/*
+ * Everything above is motion for its own sake to anyone who has asked their
+ * system not to move things. Honour that rather than making them watch it.
+ */
+@media (prefers-reduced-motion: reduce) {
+  .animate-fade-in,
+  .animate-pop-in,
+  .animate-slide-up {
+    animation: none;
+  }
+  .skeleton {
+    animation: none;
+  }
+  .horizon-spinner {
+    animation-duration: 2s;
+  }
+  * {
+    transition-duration: 0.01ms !important;
+  }
 }
 .profile-avatar-overlap {
   position: relative;

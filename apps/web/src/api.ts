@@ -11,6 +11,8 @@ export interface AffiliationSummary {
   verification: VerificationType;
   avatarShape: "circle" | "square";
   badge: string | null;
+  /** The organisation's own picture, shown as the affiliate mark. */
+  avatarUrl: string | null;
 }
 
 export interface ApiNote {
@@ -54,6 +56,32 @@ export interface ApiPost {
   bookmarkedByViewer: boolean;
   /** Whether the caller may delete it, so the menu only offers what will work. */
   deletableByViewer: boolean;
+  media: ApiMedia[];
+  poll: ApiPoll | null;
+}
+
+export interface ApiMedia {
+  id: string;
+  url: string;
+  mimeType: string;
+  type: "IMAGE" | "GIF";
+  altText: string | null;
+}
+
+export interface ApiPoll {
+  id: string;
+  expiresAt: string;
+  closed: boolean;
+  totalVotes: number;
+  votedOptionId: string | null;
+  options: { id: string; text: string; voteCount: number; share: number }[];
+}
+
+export interface ScheduledPost {
+  id: string;
+  content: string;
+  scheduledFor: string;
+  status: string;
 }
 
 export interface ApiNotification {
@@ -209,10 +237,30 @@ export const api = {
     request<{ posts: ApiPost[] }>(`/posts${author ? `?author=${encodeURIComponent(author)}` : ""}`),
   getPost: (id: string) => request<{ post: ApiPost }>(`/posts/${encodeURIComponent(id)}`),
   // The author is the signed-in account, taken from the session server-side.
-  createPost: (content: string, options?: { replyToId?: string; quoteOfId?: string }) =>
-    request<{ post: ApiPost }>("/posts", {
+  createPost: (
+    content: string,
+    options?: {
+      replyToId?: string;
+      quoteOfId?: string;
+      mediaIds?: string[];
+      poll?: { options: string[]; durationMinutes: number };
+      /** ISO timestamp. Present means the response is a schedule, not a post. */
+      scheduledFor?: string;
+    },
+  ) =>
+    request<{ post?: ApiPost; scheduled?: ScheduledPost }>("/posts", {
       method: "POST",
       body: JSON.stringify({ content, ...options }),
+    }),
+  votePoll: (postId: string, optionId: string) =>
+    request<{ post: ApiPost }>(`/posts/${encodeURIComponent(postId)}/poll/vote`, {
+      method: "POST",
+      body: JSON.stringify({ optionId }),
+    }),
+  scheduledPosts: () => request<{ scheduled: ScheduledPost[] }>("/posts/scheduled/mine"),
+  cancelScheduled: (id: string) =>
+    request<{ cancelled: boolean }>(`/posts/scheduled/${encodeURIComponent(id)}`, {
+      method: "DELETE",
     }),
   followingTimeline: () => request<{ posts: ApiPost[] }>("/posts/following"),
   replies: (id: string) => request<{ posts: ApiPost[] }>(`/posts/${encodeURIComponent(id)}/replies`),
@@ -231,7 +279,7 @@ export const api = {
     }),
 
   /** Uploads an avatar or banner and returns the URL to store on the account. */
-  uploadMedia: async (file: File, kind: "avatar" | "banner") => {
+  uploadMedia: async (file: File, kind: "avatar" | "banner" | "post") => {
     const form = new FormData();
     form.append("file", file);
     // No Content-Type header: the browser must set the multipart boundary.
@@ -248,7 +296,7 @@ export const api = {
         res.status,
       );
     }
-    return data as { url: string };
+    return data as { url: string; id?: string };
   },
 
   listNotes: (postId?: string) =>

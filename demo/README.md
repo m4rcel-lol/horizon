@@ -20,6 +20,7 @@ time and removed afterwards. Nothing here ships in the product.
 | [`authorization/`](authorization) | The same pages seen by an administrator, an ordinary account and a signed-out visitor, showing what each is allowed to reach |
 | [`ux-fixes/`](ux-fixes) | The profile avatar sitting over the banner, the five-item mobile bottom bar, the account switcher on both layouts, and the Admin Panel entry appearing only for an administrator |
 | [`complete/`](complete) | Following an account, the followers list, the Following feed, notifications with an unread badge, bookmarks, search results, and deleting a post |
+| [`composer/`](composer) | The composer's four buttons doing their jobs: emoji picker, attached images with a lightbox, a poll being built and voted on, and a post being scheduled — plus the "Follows you" chip and the affiliate mark showing the organisation's own picture |
 | [`posts-and-media/`](posts-and-media) | Replying, liking, the repost menu, a quote with the quoted post embedded below it, and an uploaded avatar and banner surviving a reload |
 
 ### Worth looking at first

@@ -1,15 +1,64 @@
 import { Body, Controller, Delete, Get, HttpException, Param, Post, Put, Query } from "@nestjs/common";
-import { IsBoolean, IsOptional, IsString, Length } from "class-validator";
+import {
+  ArrayMaxSize,
+  ArrayMinSize,
+  IsArray,
+  IsBoolean,
+  IsDateString,
+  IsInt,
+  IsOptional,
+  IsString,
+  Length,
+  Max,
+  Min,
+  ValidateNested,
+} from "class-validator";
+import { Type } from "class-transformer";
 import { PostsService } from "./posts.service";
+import { ScheduledPostsService } from "./scheduled-posts.service";
 import { DirectoryError } from "../users/user-directory.service";
 import { CurrentUser, Public } from "../auth/auth.decorators";
 import { has, type AuthenticatedUser } from "../auth/authenticated-user";
 import { PERMISSIONS } from "@horizon/shared";
 
+class PollDto {
+  @IsArray()
+  @ArrayMinSize(2)
+  @ArrayMaxSize(4)
+  @IsString({ each: true })
+  @Length(1, 40, { each: true })
+  options!: string[];
+
+  /** Five minutes to a week, matching what the composer offers. */
+  @IsInt()
+  @Min(5)
+  @Max(10080)
+  durationMinutes!: number;
+}
+
 class CreatePostDto {
+  // A post with an image or a poll needs no words, so the floor is zero when
+  // something else carries it. Checked in the handler, where both are visible.
   @IsString()
-  @Length(1, 500)
+  @Length(0, 500)
   content!: string;
+
+  /** Up to four uploads from POST /media/upload?kind=post. */
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(4)
+  @IsString({ each: true })
+  mediaIds?: string[];
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => PollDto)
+  poll?: PollDto;
+
+  /** ISO timestamp. Present means "write it now, publish it then". */
+  @IsOptional()
+  @IsDateString()
+  scheduledFor?: string;
 
   /** Makes this a reply to that post. */
   @IsOptional()
@@ -29,6 +78,12 @@ class SetFlagDto {
   on!: boolean;
 }
 
+class VoteDto {
+  @IsString()
+  @Length(1, 64)
+  optionId!: string;
+}
+
 /**
  * Posts.
  *
@@ -38,7 +93,10 @@ class SetFlagDto {
  */
 @Controller("posts")
 export class PostsController {
-  constructor(private readonly posts: PostsService) {}
+  constructor(
+    private readonly posts: PostsService,
+    private readonly scheduled: ScheduledPostsService,
+  ) {}
 
   private async unwrap<T>(fn: () => Promise<T> | T): Promise<T> {
     try {
@@ -66,14 +124,69 @@ export class PostsController {
 
   @Post()
   async create(@Body() body: CreatePostDto, @CurrentUser() auth: AuthenticatedUser) {
+    return this.unwrap(async () => {
+      const hasContent =
+        body.content.trim().length > 0 || (body.mediaIds?.length ?? 0) > 0 || Boolean(body.poll);
+      if (!hasContent) {
+        throw new DirectoryError("EMPTY_POST", "Write something, or attach an image or poll.", 400);
+      }
+
+      // Scheduling stores the intent; the publisher turns it into a post when
+      // the time comes. A poll is not schedulable — its clock starts when it
+      // is published, which would make the chosen duration meaningless.
+      if (body.scheduledFor) {
+        if (body.poll) {
+          throw new DirectoryError(
+            "POLL_NOT_SCHEDULABLE",
+            "A poll cannot be scheduled; its timer starts when it is posted.",
+            400,
+          );
+        }
+        return this.scheduled.schedule({
+          userId: auth.id,
+          username: auth.username,
+          content: body.content,
+          scheduledFor: new Date(body.scheduledFor),
+          replyToId: body.replyToId,
+          quoteOfId: body.quoteOfId,
+          mediaIds: body.mediaIds,
+        });
+      }
+
+      return {
+        post: await this.posts.create({
+          author: auth.username,
+          content: body.content,
+          replyToId: body.replyToId,
+          quoteOfId: body.quoteOfId,
+          mediaIds: body.mediaIds,
+          poll: body.poll,
+          viewerId: auth.id,
+        }),
+      };
+    });
+  }
+
+  /** Posts written but not yet published. */
+  @Get("scheduled/mine")
+  async scheduledPosts(@CurrentUser() auth: AuthenticatedUser) {
+    return { scheduled: await this.scheduled.list(auth.id) };
+  }
+
+  @Delete("scheduled/:id")
+  async cancelScheduled(@Param("id") id: string, @CurrentUser() auth: AuthenticatedUser) {
+    return this.unwrap(() => this.scheduled.cancel(id, auth.id));
+  }
+
+  /** One vote per account, changeable while the poll is open. */
+  @Post(":id/poll/vote")
+  async vote(
+    @Param("id") id: string,
+    @Body() body: VoteDto,
+    @CurrentUser() auth: AuthenticatedUser,
+  ) {
     return this.unwrap(async () => ({
-      post: await this.posts.create({
-        author: auth.username,
-        content: body.content,
-        replyToId: body.replyToId,
-        quoteOfId: body.quoteOfId,
-        viewerId: auth.id,
-      }),
+      post: await this.posts.votePoll(id, body.optionId, auth.id),
     }));
   }
 

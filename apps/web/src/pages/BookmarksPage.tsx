@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { api, type ApiPost } from "../api";
 import { PostCard } from "../components/PostCard";
 import { ComposerModal, type ComposerTarget } from "../components/ComposerModal";
-import { PageLoader } from "../components/LoadingSpinner";
+import { TimelineSkeleton } from "../components/LoadingSpinner";
 import { useSession } from "../hooks/useSession";
 
 export function BookmarksPage() {
@@ -40,7 +40,7 @@ export function BookmarksPage() {
           </Link>
         </div>
       ) : isLoading ? (
-        <PageLoader label="Loading bookmarks…" />
+        <TimelineSkeleton />
       ) : posts.length === 0 ? (
         <div className="empty-state">
           <h2>Save posts for later</h2>

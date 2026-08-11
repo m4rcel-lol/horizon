@@ -7,6 +7,7 @@ import { PostCard } from "../components/PostCard";
 import { ComposerModal, type ComposerTarget } from "../components/ComposerModal";
 import { Avatar } from "../components/Verification";
 import { useSession } from "../hooks/useSession";
+import { TimelineSkeleton } from "../components/LoadingSpinner";
 
 export function PostPage() {
   const { username, postId } = useParams();
@@ -65,9 +66,7 @@ export function PostPage() {
       </header>
 
       {isLoading ? (
-        <p className="px-4 py-6 text-[15px]" style={{ color: "var(--color-text-secondary)" }}>
-          Loading post…
-        </p>
+        <TimelineSkeleton rows={2} />
       ) : missing ? (
         <div className="empty-state">
           <h2>This post doesn&apos;t exist</h2>

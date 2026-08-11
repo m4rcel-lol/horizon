@@ -57,7 +57,7 @@ export function AffiliateBadge({
   organisation,
   size = 18,
 }: {
-  organisation: { username: string; displayName: string };
+  organisation: { username: string; displayName: string; avatarUrl?: string | null };
   size?: number;
 }) {
   return (
@@ -66,8 +66,11 @@ export function AffiliateBadge({
       title={`Affiliated with ${organisation.displayName} (@${organisation.username})`}
       className="inline-flex shrink-0 align-middle"
     >
+      {/* The mark is the organisation's own picture — that is what makes it
+          recognisable at a glance. It used to be hardcoded to the default
+          avatar, so every affiliation looked identical. */}
       <img
-        src="/assets/default-avatar.svg"
+        src={organisation.avatarUrl || "/assets/default-avatar.svg"}
         alt={`Affiliated with @${organisation.username}`}
         style={{ width: size, height: size, borderRadius: Math.round(size * 0.15) }}
         className="object-cover bg-[var(--color-bg-secondary)]"
@@ -85,20 +88,36 @@ export function NameWithBadges({
   badgeClassName,
   badgeHref,
   badgeTitle,
+  nameHref,
 }: {
   displayName: string;
   verification: VerificationType;
-  affiliatedTo?: { username: string; displayName: string } | null;
+  affiliatedTo?: { username: string; displayName: string; avatarUrl?: string | null } | null;
   className?: string;
   badgeClassName?: string;
   /** Makes the badge a link — used on organisations to open their affiliates. */
   badgeHref?: string;
   badgeTitle?: string;
+  /**
+   * Links the name itself.
+   *
+   * Callers used to wrap this whole component in a link, which nested the
+   * affiliate mark's own link inside it — invalid HTML, and the browser drops
+   * the inner one, so the mark stopped opening the organisation. Linking only
+   * the name keeps the two destinations separate and reachable.
+   */
+  nameHref?: string;
 }) {
   const badge = <VerifiedBadge type={verification} className={badgeClassName} />;
   return (
     <span className={`inline-flex items-center gap-1 min-w-0 ${className}`}>
-      <span className="truncate">{displayName}</span>
+      {nameHref ? (
+        <Link to={nameHref} className="truncate hover:underline">
+          {displayName}
+        </Link>
+      ) : (
+        <span className="truncate">{displayName}</span>
+      )}
       {badgeHref ? (
         <Link to={badgeHref} title={badgeTitle} className="inline-flex shrink-0">
           {badge}
