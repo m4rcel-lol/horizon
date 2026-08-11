@@ -225,3 +225,13 @@ export function QuoteIcon(props: IconProps) {
     </svg>
   );
 }
+
+/** Robot: marks an automated account, and the notifications that set one up. */
+export function RobotIcon(props: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" {...props}>
+      <path d="M12 1.5a1.25 1.25 0 0 1 1.25 1.25v1.5H18A2.75 2.75 0 0 1 20.75 7v9A2.75 2.75 0 0 1 18 18.75H6A2.75 2.75 0 0 1 3.25 16V7A2.75 2.75 0 0 1 6 4.25h4.75v-1.5A1.25 1.25 0 0 1 12 1.5zM8.5 9.25a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3zm7 0a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3zM8 14.5v1.75h8V14.5H8z" />
+      <path d="M1.5 10.5h1.25v4H1.5a.75.75 0 0 1-.75-.75v-2.5a.75.75 0 0 1 .75-.75zm21 0a.75.75 0 0 1 .75.75v2.5a.75.75 0 0 1-.75.75h-1.25v-4h1.25z" />
+    </svg>
+  );
+}

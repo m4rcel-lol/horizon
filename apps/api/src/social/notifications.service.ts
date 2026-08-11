@@ -2,6 +2,14 @@ import { Injectable, Logger } from "@nestjs/common";
 import { PrismaService } from "../database/prisma.service";
 import { UserDirectoryService, type PresentedUser } from "../users/user-directory.service";
 
+/**
+ * Every member of the database's NotificationType.
+ *
+ * This list must stay exhaustive. It is what `list()` casts rows to, so a type
+ * missing here is not a compile error — it is a row arriving at a client with
+ * no case for it, which is how a join request came to render as "did
+ * something".
+ */
 export type NotificationKind =
   | "LIKE"
   | "REPLY"
@@ -9,14 +17,36 @@ export type NotificationKind =
   | "QUOTE"
   | "MENTION"
   | "FOLLOW"
-  | "COMMUNITY";
+  | "FOLLOW_REQUEST"
+  | "DM"
+  | "COMMUNITY"
+  | "MODERATION"
+  | "SYSTEM";
+
+/**
+ * What a notification is about, within its type.
+ *
+ * COMMUNITY covers both "someone asked to join" and "your request was
+ * accepted", and the two read nothing alike, so the type alone is not enough
+ * to write the sentence.
+ */
+export type NotificationDetail =
+  | "JOIN_REQUEST"
+  | "JOIN_APPROVED"
+  | "AUTOMATION_REQUEST"
+  | "AUTOMATION_ACCEPTED"
+  | "AUTOMATION_DECLINED";
 
 export interface PresentedNotification {
   id: string;
   type: NotificationKind;
+  /** Discriminates within the type. Null when the type says it all. */
+  kind: NotificationDetail | null;
   actor: PresentedUser | null;
   postId: string | null;
   communityId: string | null;
+  /** Named, so a row can say which community without a second request. */
+  community: { slug: string; name: string } | null;
   /** Deep-link path when the notification should open a specific page. */
   href: string | null;
   /** A short excerpt, so the row says something without loading the post. */
@@ -128,7 +158,7 @@ export class NotificationsService {
       postIds.length
         ? this.prisma.post.findMany({
             where: { id: { in: postIds } },
-            select: { id: true, content: true },
+            select: { id: true, content: true, author: { select: { username: true } } },
           })
         : Promise.resolve([]),
     ]);
@@ -138,30 +168,49 @@ export class NotificationsService {
       actors.map(async (a) => presentedActors.set(a.id, await this.directory.tryGet(a.username))),
     );
     const excerpts = new Map(posts.map((p) => [p.id, p.content.slice(0, 140)]));
+    // Permalinks are built here because the post's author is the one who owns
+    // the URL, and that is rarely the actor: on a like or a repost the post is
+    // the recipient's, so a link assembled from the actor points at a handle
+    // that has nothing to do with the post.
+    const permalinks = new Map(
+      posts.map((p) => [p.id, `/${p.author.username}/status/${p.id}`]),
+    );
 
     return rows.map((row) => {
       const data = (row.data ?? {}) as {
-        kind?: string;
+        kind?: NotificationDetail;
         communitySlug?: string;
         communityName?: string;
         requestId?: string;
       };
-      let href: string | null = null;
-      let excerpt: string | null = row.postId ? excerpts.get(row.postId) ?? null : null;
-      if (row.type === "COMMUNITY" && data.kind === "JOIN_REQUEST" && data.communitySlug) {
-        href = `/communities/${data.communitySlug}/requests`;
-        excerpt = data.communityName
-          ? `wants to join ${data.communityName}`
-          : "wants to join a community";
+      const kind = data.kind ?? null;
+      const community =
+        data.communitySlug && data.communityName
+          ? { slug: data.communitySlug, name: data.communityName }
+          : null;
+
+      // Where the row goes when tapped. The sentence itself stays the client's
+      // business: it renders names and badges as elements, which a string
+      // assembled here could not carry.
+      let href: string | null = row.postId ? permalinks.get(row.postId) ?? null : null;
+      if (kind === "JOIN_REQUEST" && community) {
+        href = `/communities/${community.slug}/requests`;
+      } else if (kind === "JOIN_APPROVED" && community) {
+        href = `/communities/${community.slug}`;
+      } else if (kind?.startsWith("AUTOMATION_")) {
+        href = "/settings";
       }
+
       return {
         id: row.id,
         type: row.type as NotificationKind,
+        kind,
         actor: row.actorId ? presentedActors.get(row.actorId) ?? null : null,
         postId: row.postId,
         communityId: row.communityId ?? null,
+        community,
         href,
-        excerpt,
+        excerpt: row.postId ? excerpts.get(row.postId) ?? null : null,
         read: row.readAt !== null,
         createdAt: row.createdAt.toISOString(),
       };

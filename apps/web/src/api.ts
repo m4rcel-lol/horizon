@@ -140,12 +140,42 @@ export interface ScheduledPost {
   status: string;
 }
 
+/**
+ * Every member of the API's NotificationKind.
+ *
+ * Kept exhaustive on purpose: NotificationsPage switches over it with a `never`
+ * check, so adding a type on the server and forgetting the client here is a
+ * build error rather than a row that renders as "did something".
+ */
+export type ApiNotificationType =
+  | "LIKE"
+  | "REPLY"
+  | "REPOST"
+  | "QUOTE"
+  | "MENTION"
+  | "FOLLOW"
+  | "FOLLOW_REQUEST"
+  | "DM"
+  | "COMMUNITY"
+  | "MODERATION"
+  | "SYSTEM";
+
+export type ApiNotificationDetail =
+  | "JOIN_REQUEST"
+  | "JOIN_APPROVED"
+  | "AUTOMATION_REQUEST"
+  | "AUTOMATION_ACCEPTED"
+  | "AUTOMATION_DECLINED";
+
 export interface ApiNotification {
   id: string;
-  type: "LIKE" | "REPLY" | "REPOST" | "QUOTE" | "MENTION" | "FOLLOW" | "COMMUNITY";
+  type: ApiNotificationType;
+  /** Which flavour of the type this is, where the type alone is ambiguous. */
+  kind: ApiNotificationDetail | null;
   actor: ApiUser | null;
   postId: string | null;
   communityId?: string | null;
+  community: { slug: string; name: string } | null;
   href?: string | null;
   excerpt: string | null;
   read: boolean;
