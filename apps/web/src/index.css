@@ -337,16 +337,27 @@ body {
   }
 }
 
+/*
+ * `backwards`, never `both`.
+ *
+ * Each of these ends on the element's natural styles, so there is nothing to
+ * hold with `forwards` — and holding it is actively harmful: a lingering
+ * transform makes the element a stacking context for good. Timeline rows
+ * animate in, so with `both` every row became its own stacking context and a
+ * dropdown opened in one row was painted *under* the row below it, whatever
+ * z-index it carried. `backwards` still applies the from-state during the
+ * stagger delay, which is the only reason the fill mode was there.
+ */
 .animate-fade-in {
-  animation: horizon-fade-in 0.25s ease-out both;
+  animation: horizon-fade-in 0.25s ease-out backwards;
 }
 /* Menus, pickers and lightboxes: they appear at a point, so they scale from it. */
 .animate-pop-in {
-  animation: horizon-pop-in 0.15s ease-out both;
+  animation: horizon-pop-in 0.15s ease-out backwards;
 }
 /* Rows arriving in a list. */
 .animate-slide-up {
-  animation: horizon-slide-up 0.28s cubic-bezier(0.2, 0, 0.2, 1) both;
+  animation: horizon-slide-up 0.28s cubic-bezier(0.2, 0, 0.2, 1) backwards;
 }
 
 /*
