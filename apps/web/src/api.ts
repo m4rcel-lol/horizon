@@ -64,7 +64,6 @@ export interface ApiUser {
   status: "ACTIVE" | "SUSPENDED";
   isSystem: boolean;
   loginDisabled: boolean;
-  isAdmin?: boolean;
   bannerUrl?: string | null;
   followingCount?: number;
   followersCount?: number;

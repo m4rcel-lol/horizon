@@ -16,6 +16,7 @@ import {
 } from "../icons";
 import { useSession } from "../hooks/useSession";
 import { MobileTopBar, MobileDrawer, MobileBottomNav } from "../components/MobileNav";
+import { PERMISSIONS } from "@horizon/shared";
 
 const navItems = [
   { to: "/", label: "Home", icon: HomeIcon, end: true },
@@ -35,7 +36,11 @@ export function MainLayout() {
   const moreRef = useRef<HTMLLIElement>(null);
   const accountRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
-  const { accounts, active, logout, isAuthenticated } = useSession();
+  const { accounts, active, logout, isAuthenticated, can } = useSession();
+  // Driven by the caller's own permissions, which only ever describe them —
+  // the public user object must not say who the administrators are.
+  const canAdminister =
+    can(PERMISSIONS.SETTINGS_VIEW) || can(PERMISSIONS.VERIFICATION_GRANT);
 
   useEffect(() => {
     const onDoc = (e: MouseEvent) => {
@@ -117,7 +122,7 @@ export function MainLayout() {
                       <SettingsIcon className="w-5 h-5" />
                       Settings
                     </Link>
-                    {active?.isAdmin ? (
+                    {canAdminister ? (
                       <Link
                         role="menuitem"
                         to="/admin/settings"
