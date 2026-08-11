@@ -24,4 +24,10 @@ COPY --from=builder /app /app
 EXPOSE 3000
 # Apply pending migrations before serving: a fresh deployment must build its own
 # schema, and an upgrade must not start against an older one.
-CMD ["sh", "-c", "npx prisma migrate deploy --schema packages/database/prisma/schema.prisma && node apps/api/dist/main.js"]
+#
+# Invoke the workspace's own Prisma directly rather than through npx. There is no
+# prisma binary in the root node_modules, so `npx prisma` resolves nothing
+# locally and downloads the newest release instead — Prisma 7 rejects `url` in
+# the datasource block and the container never starts. This path pins the
+# version the lockfile installed, and needs no network.
+CMD ["sh", "-c", "node packages/database/node_modules/prisma/build/index.js migrate deploy --schema packages/database/prisma/schema.prisma && node apps/api/dist/main.js"]
