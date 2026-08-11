@@ -36,6 +36,11 @@ export interface PresentedPost {
   deletableByViewer: boolean;
   media: { id: string; url: string; mimeType: string; type: "IMAGE" | "GIF"; altText: string | null }[];
   poll: PresentedPoll | null;
+  /**
+   * Set when this row appears because someone reposted it, rather than wrote
+   * it. The card shows "@x reposted" above the original author.
+   */
+  repostedBy: { username: string; displayName: string } | null;
 }
 
 export interface PresentedPoll {
@@ -204,6 +209,7 @@ export class PostsService {
       deletableByViewer: viewerId === post.authorId,
       media: await this.mediaService.describe(post.media.map((m) => m.mediaId)),
       poll: post.poll ? await this.presentPoll(post.poll, viewerId) : null,
+      repostedBy: null,
     };
   }
 
@@ -439,7 +445,42 @@ export class PostsService {
       take: 100,
       select: POST_SELECT,
     })) as PostRow[];
-    return Promise.all(posts.map((p) => this.present(p, viewerId)));
+
+    const presented = await Promise.all(posts.map((p) => this.present(p, viewerId)));
+    if (!author) return presented;
+
+    // On a profile, a repost is something the account did, so it belongs on
+    // their timeline — placed by when they reposted it, not when it was
+    // written, which is the order the visitor is reading in.
+    const reposts = await this.prisma.postRepost.findMany({
+      where: { user: { username: author }, post: { deletedAt: null } },
+      orderBy: { createdAt: "desc" },
+      take: 100,
+      select: {
+        createdAt: true,
+        user: { select: { username: true, displayName: true } },
+        post: { select: POST_SELECT },
+      },
+    });
+
+    const reposted = await Promise.all(
+      reposts.map(async (r) => ({
+        at: r.createdAt.getTime(),
+        post: {
+          ...(await this.present(r.post as PostRow, viewerId)),
+          repostedBy: { username: r.user.username, displayName: r.user.displayName },
+        },
+      })),
+    );
+
+    // Their own post that they also reposted would otherwise appear twice.
+    const own = new Set(presented.map((p) => p.id));
+    const merged = [
+      ...presented.map((p) => ({ at: new Date(p.createdAt).getTime(), post: p })),
+      ...reposted.filter((r) => !own.has(r.post.id)),
+    ];
+    merged.sort((a, b) => b.at - a.at);
+    return merged.slice(0, 100).map((m) => m.post);
   }
 
   async get(id: string, viewerId: string | null = null): Promise<PresentedPost> {

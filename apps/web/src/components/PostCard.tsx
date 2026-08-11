@@ -3,6 +3,7 @@ import type { ApiPost } from "../api";
 import { Avatar, NameWithBadges } from "./Verification";
 import { CommunityNoteCard } from "./CommunityNote";
 import { PostActions } from "./PostActions";
+import { RepostIcon } from "../icons";
 import { PostMediaGrid, PostPoll } from "./PostMedia";
 
 /** "3h", "2d", or a date once it stops being recent. */
@@ -195,6 +196,24 @@ export function PostCard({
     );
   }
 
+  // Why this row is here at all, when it is on someone's profile because they
+  // reposted it rather than wrote it.
+  const repostHeader = post.repostedBy ? (
+    <p
+      className="flex items-center gap-2 text-[13px] font-bold mb-1"
+      style={{ color: "var(--color-text-secondary)" }}
+    >
+      <RepostIcon className="w-4 h-4 shrink-0" />
+      <Link
+        to={`/${post.repostedBy.username}`}
+        className="hover:underline"
+        onClick={(event) => event.stopPropagation()}
+      >
+        {post.repostedBy.displayName} reposted
+      </Link>
+    </p>
+  ) : null;
+
   return (
     <article
       // A row, not a <Link>, so the actions and author links inside it stay
@@ -209,14 +228,17 @@ export function PostCard({
       className="flex gap-3 px-4 py-3 border-b cursor-pointer transition-colors hover:bg-[var(--color-row-hover)]"
       style={{ borderColor: "var(--color-border)" }}
     >
-      <Link to={`/${handle}`} className="shrink-0" onClick={(event) => event.stopPropagation()}>
-        <Avatar
-          shape={author?.avatarShape ?? "circle"}
-          size={40}
-          src={author?.avatarUrl || "/assets/default-avatar.svg"}
-        />
-      </Link>
+      <div className="shrink-0" style={{ paddingTop: post.repostedBy ? 22 : 0 }}>
+        <Link to={`/${handle}`} onClick={(event) => event.stopPropagation()}>
+          <Avatar
+            shape={author?.avatarShape ?? "circle"}
+            size={40}
+            src={author?.avatarUrl || "/assets/default-avatar.svg"}
+          />
+        </Link>
+      </div>
       <div className="min-w-0 flex-1">
+        {repostHeader}
         <div className="flex items-center gap-1 text-[15px] min-w-0">
           <span className="font-bold min-w-0" onClick={(event) => event.stopPropagation()}>
             {identity}

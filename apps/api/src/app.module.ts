@@ -11,6 +11,8 @@ import { SetupModule } from "./setup/setup.module";
 import { CommunityNotesModule } from "./notes/community-notes.module";
 import { MediaModule } from "./media/media.module";
 import { SocialModule } from "./social/social.module";
+import { CommunitiesModule } from "./communities/communities.module";
+import { StatsModule } from "./stats/stats.module";
 import { SessionGuard } from "./auth/session.guard";
 import { PermissionsGuard } from "./auth/permissions.guard";
 
@@ -33,6 +35,8 @@ import { PermissionsGuard } from "./auth/permissions.guard";
     CommunityNotesModule,
     MediaModule,
     SocialModule,
+    CommunitiesModule,
+    StatsModule,
   ],
   // Guards run in the order they are declared. Rate limiting comes first so a
   // flood is cheap to reject; SessionGuard then resolves the caller and closes
