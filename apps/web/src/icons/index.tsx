@@ -216,3 +216,12 @@ export function NoteIcon(props: IconProps) {
     </svg>
   );
 }
+
+/** Quote: a speech bubble with a pen, distinguishing it from a plain repost. */
+export function QuoteIcon(props: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" {...props}>
+      <path d="M4 4h16a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H9l-5 4v-4H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2zm3.5 4.5v2h3v-2h-3zm0 4v2h9v-2h-9z" />
+    </svg>
+  );
+}

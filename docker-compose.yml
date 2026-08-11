@@ -36,6 +36,8 @@ services:
     environment:
       - DATABASE_URL=postgresql://${POSTGRES_USER:-horizon}:${POSTGRES_PASSWORD:-horizon}@postgres:5432/${POSTGRES_DB:-horizon}?schema=public
       - REDIS_URL=redis://redis:6379
+      # Uploaded avatars and banners. A named volume, so they survive a rebuild.
+      - MEDIA_ROOT=/app/data/media
     depends_on:
       postgres:
         condition: service_healthy
@@ -53,6 +55,7 @@ services:
       - horizon
     volumes:
       - ./assets:/app/assets:ro
+      - media_data:/app/data/media
 
   worker:
     build:
@@ -160,6 +163,7 @@ services:
 
 volumes:
   postgres_data:
+  media_data:
   redis_data:
   minio_data:
   caddy_data:
