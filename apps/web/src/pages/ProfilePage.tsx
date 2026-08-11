@@ -215,7 +215,7 @@ export function ProfilePage() {
       ) : (
         <div className="empty-state">
           <h2>No posts yet</h2>
-          <p>When @{user?.username ?? handle || "you"} posts, it will show up here.</p>
+          <p>When @{(user?.username ?? handle) || "you"} posts, it will show up here.</p>
         </div>
       )}
 
