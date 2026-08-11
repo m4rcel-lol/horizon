@@ -119,6 +119,21 @@ pnpm --filter @horizon/api dev
 pnpm --filter @horizon/web dev
 ```
 
+## Database migrations
+
+The API container runs `prisma migrate deploy` before it starts serving, so a
+fresh install creates its own schema and an upgrade applies pending migrations
+first. Running migrations by hand is only needed for local development outside
+Docker:
+
+```bash
+DATABASE_URL=... pnpm --filter @horizon/database exec prisma migrate deploy
+```
+
+The schema needs the `citext` extension for case-insensitive usernames and
+emails; the initial migration creates it, so the database user must be allowed
+to `CREATE EXTENSION` (the default superuser in the bundled Postgres is).
+
 ## Production Notes
 
 - Point DNS A/AAAA records for `horizon.european-commission-europa.eu` (and `www`) to the host

@@ -1,5 +1,13 @@
 import { Module } from "@nestjs/common";
+import { AuthController } from "./auth.controller";
+import { AuthService } from "./auth.service";
+import { UsersModule } from "../users/users.module";
 
-/** Auth module placeholder — registration, login, sessions, 2FA. */
-@Module({})
+/** Registration, sign-in, and persistent sessions. */
+@Module({
+  imports: [UsersModule],
+  controllers: [AuthController],
+  providers: [AuthService],
+  exports: [AuthService],
+})
 export class AuthModule {}

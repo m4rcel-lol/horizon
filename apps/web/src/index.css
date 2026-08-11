@@ -263,3 +263,23 @@ body {
     text-decoration: underline;
   }
 }
+
+@layer components {
+  /* Long-form prose: policies and docs. */
+  .legal-prose p {
+    @apply text-[15px] leading-6 mb-3;
+  }
+  .legal-prose ul {
+    @apply list-disc pl-5 mb-3 flex flex-col gap-1.5 text-[15px] leading-6;
+  }
+  .legal-prose ol {
+    @apply list-decimal pl-5 mb-3 flex flex-col gap-1.5 text-[15px] leading-6;
+  }
+  .legal-prose h3 {
+    @apply text-[17px] font-bold mt-5 mb-1;
+  }
+  .legal-prose code {
+    @apply text-[13px] rounded px-1 py-0.5;
+    background: var(--color-bg-secondary);
+  }
+}

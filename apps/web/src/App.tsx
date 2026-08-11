@@ -1,5 +1,7 @@
-import { Routes, Route } from "react-router-dom";
+import { Routes, Route, Navigate } from "react-router-dom";
 import { MainLayout } from "./layouts/MainLayout";
+import { useSession } from "./hooks/useSession";
+import { LandingPage } from "./pages/LandingPage";
 import { HomePage } from "./pages/HomePage";
 import { ExplorePage } from "./pages/ExplorePage";
 import { NotificationsPage } from "./pages/NotificationsPage";
@@ -17,6 +19,9 @@ import { LoginPage } from "./pages/LoginPage";
 import { RegisterPage } from "./pages/RegisterPage";
 import { AdminSettingsPage } from "./pages/AdminSettingsPage";
 import { AdminVerificationPage } from "./pages/AdminVerificationPage";
+import { PrivacyPage } from "./pages/PrivacyPage";
+import { TermsPage } from "./pages/TermsPage";
+import { DocsPage, DocsIndex, DocArticle } from "./pages/DocsPage";
 import {
   SettingsPage,
   SettingsAppearancePage,
@@ -24,17 +29,33 @@ import {
   SettingsPrivacyPage,
 } from "./pages/SettingsPage";
 
+/**
+ * The root is the landing page for visitors, and the timeline for members.
+ *
+ * The landing page renders standalone rather than inside the app shell — a
+ * signed-out visitor should not be looking at a navigation rail for an account
+ * they do not have. Waiting for the session to resolve avoids flashing the
+ * marketing page at someone who is already signed in.
+ */
+function RootRoute() {
+  const { active, loading } = useSession();
+  if (loading) return null;
+  return active ? <Navigate to="/home" replace /> : <LandingPage />;
+}
+
 export default function App() {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
       <Route path="/setup" element={<SetupPage />} />
-      <Route path="/about" element={<AboutPage />} />
       <Route path="/admin/settings" element={<AdminSettingsPage />} />
       <Route path="/admin/verification" element={<AdminVerificationPage />} />
+
+      <Route path="/" element={<RootRoute />} />
+
       <Route element={<MainLayout />}>
-        <Route path="/" element={<HomePage />} />
+        <Route path="/home" element={<HomePage />} />
         <Route path="/explore" element={<ExplorePage />} />
         <Route path="/notifications" element={<NotificationsPage />} />
         <Route path="/messages" element={<MessagesPage />} />
@@ -43,6 +64,13 @@ export default function App() {
         <Route path="/lists" element={<ListsPage />} />
         <Route path="/communities" element={<CommunitiesPage />} />
         <Route path="/profile" element={<ProfilePage />} />
+        <Route path="/about" element={<AboutPage />} />
+        <Route path="/privacy" element={<PrivacyPage />} />
+        <Route path="/terms" element={<TermsPage />} />
+        <Route path="/docs" element={<DocsPage />}>
+          <Route index element={<DocsIndex />} />
+          <Route path=":slug" element={<DocArticle />} />
+        </Route>
         <Route path="/settings" element={<SettingsPage />}>
           <Route path="appearance" element={<SettingsAppearancePage />} />
           <Route path="account" element={<SettingsAccountPage />} />

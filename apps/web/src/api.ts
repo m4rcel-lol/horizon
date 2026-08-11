@@ -95,6 +95,22 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export const api = {
+  // Auth
+  me: () => request<{ user: ApiUser | null }>("/auth/me"),
+  login: (identifier: string, password: string, remember = true) =>
+    request<{ user: ApiUser }>("/auth/login", {
+      method: "POST",
+      body: JSON.stringify({ identifier, password, remember }),
+    }),
+  register: (input: { username: string; email: string; password: string; displayName?: string }) =>
+    request<{ user: ApiUser }>("/auth/register", { method: "POST", body: JSON.stringify(input) }),
+  logout: () => request<{ ok: boolean }>("/auth/logout", { method: "POST" }),
+  sessions: () =>
+    request<{ current: string; sessions: { id: string; userAgent: string | null; ipAddress: string | null; createdAt: string; lastUsedAt: string }[] }>(
+      "/auth/sessions",
+    ),
+  revokeOtherSessions: () => request<{ revoked: number }>("/auth/sessions/revoke-others", { method: "POST" }),
+
   listUsers: () => request<{ users: ApiUser[] }>("/users"),
   getUser: (username: string) => request<{ user: ApiUser }>(`/users/${encodeURIComponent(username)}`),
   createUser: (body: { username: string; displayName: string; bio?: string; verification?: VerificationType }) =>

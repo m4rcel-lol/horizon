@@ -18,6 +18,7 @@ Horizon is a production-grade, independently implemented social platform that ca
 - Comprehensive admin panel & instance configuration
 - Optional ActivityPub federation (isolated module)
 - Real-time updates via WebSockets
+- Sign-up and sign-in with Argon2id passwords and persistent sessions
 - Privacy controls, 2FA, WebAuthn, data export
 - Docker-first deployment with Caddy
 
@@ -49,7 +50,11 @@ Prefer Docker to run the proxy as well? It's opt-in:
 docker compose --profile edge up -d   # adds caddy:2-alpine on ports 80/443
 ```
 
-Then open your instance URL and complete the first-run setup at `/setup`.
+Then open your instance URL. Visitors get a landing page; create an account and
+you land on the timeline.
+
+Database migrations run automatically when the API container starts, so a fresh
+install builds its own schema with no extra step.
 
 ## Documentation
 
@@ -57,6 +62,7 @@ See the `docs/` directory:
 
 - [Installation](docs/installation.md)
 - [Configuration](docs/configuration.md)
+- [Authentication & sessions](docs/authentication.md)
 - [Verification & affiliation](docs/verification.md)
 - [Community Notes](docs/community-notes.md)
 - [Architecture](docs/architecture.md)

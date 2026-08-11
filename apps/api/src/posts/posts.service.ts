@@ -1,15 +1,14 @@
 import { Injectable } from "@nestjs/common";
 import { CommunityNotesService, type PresentedNote } from "../notes/community-notes.service";
-import { DirectoryError, UserDirectoryService, type PresentedUser } from "../users/user-directory.service";
+import { PrismaService } from "../database/prisma.service";
+import { DirectoryError } from "../users/directory-error";
+import { UserDirectoryService, type PresentedUser } from "../users/user-directory.service";
 
-export interface StoredPost {
+export interface PresentedPost {
   id: string;
   authorUsername: string;
   content: string;
   createdAt: string;
-}
-
-export interface PresentedPost extends StoredPost {
   /**
    * The author's full public identity, resolved at read time so a timeline
    * renders badges, affiliation and avatar shape without a second request per
@@ -21,66 +20,70 @@ export interface PresentedPost extends StoredPost {
 }
 
 /**
- * In-memory posts.
+ * Posts, stored in Postgres.
  *
- * Enough to render a timeline and a post in full with real author identity;
- * likes, reposts, replies and media are still to come. Written to move to
- * Prisma without changing this surface — the Post model is already in the
- * schema.
+ * Likes, reposts, replies and media are still to come; this covers writing a
+ * post and reading a timeline with real author identity attached.
  */
 @Injectable()
 export class PostsService {
-  private posts = new Map<string, StoredPost>();
-  private seq = 0;
-
   constructor(
+    private readonly prisma: PrismaService,
     private readonly directory: UserDirectoryService,
     private readonly notes: CommunityNotesService,
   ) {}
 
-  private present(post: StoredPost): PresentedPost {
+  private async present(post: {
+    id: string;
+    content: string;
+    createdAt: Date;
+    author: { username: string };
+  }): Promise<PresentedPost> {
+    const [author, notes] = await Promise.all([
+      this.directory.tryGet(post.author.username),
+      this.notes.forPost(post.id),
+    ]);
     return {
-      ...post,
-      author: this.directory.tryGet(post.authorUsername),
-      notes: this.notes.forPost(post.id),
+      id: post.id,
+      authorUsername: post.author.username,
+      content: post.content,
+      createdAt: post.createdAt.toISOString(),
+      author,
+      notes,
     };
   }
 
-  private require(id: string): StoredPost {
-    const post = this.posts.get(id);
-    if (!post) throw new DirectoryError("POST_NOT_FOUND", `No post ${id} on this instance.`, 404);
-    return post;
-  }
-
-  create(input: { author: string; content: string }): PresentedPost {
+  async create(input: { author: string; content: string }): Promise<PresentedPost> {
     // Reject unknown authors rather than storing a dangling handle.
-    this.directory.get(input.author);
-    this.seq += 1;
-    const post: StoredPost = {
-      id: `${Date.now().toString(36)}${this.seq.toString(36)}`,
-      authorUsername: input.author,
-      content: input.content,
-      createdAt: new Date().toISOString(),
-    };
-    this.posts.set(post.id, post);
+    const author = await this.directory.get(input.author);
+
+    const post = await this.prisma.post.create({
+      data: { authorId: author.id, content: input.content },
+      select: { id: true, content: true, createdAt: true, author: { select: { username: true } } },
+    });
     return this.present(post);
   }
 
   /** Reverse-chronological, optionally limited to one author. */
-  list(author?: string): PresentedPost[] {
-    return [...this.posts.values()]
-      .filter((p) => !author || p.authorUsername.toLowerCase() === author.toLowerCase())
-      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
-      .map((p) => this.present(p));
+  async list(author?: string): Promise<PresentedPost[]> {
+    const posts = await this.prisma.post.findMany({
+      where: {
+        deletedAt: null,
+        ...(author ? { author: { username: author } } : {}),
+      },
+      orderBy: { createdAt: "desc" },
+      take: 100,
+      select: { id: true, content: true, createdAt: true, author: { select: { username: true } } },
+    });
+    return Promise.all(posts.map((p) => this.present(p)));
   }
 
-  get(id: string): PresentedPost {
-    return this.present(this.require(id));
-  }
-
-  reset() {
-    const removed = this.posts.size;
-    this.posts.clear();
-    return { removed };
+  async get(id: string): Promise<PresentedPost> {
+    const post = await this.prisma.post.findFirst({
+      where: { id, deletedAt: null },
+      select: { id: true, content: true, createdAt: true, author: { select: { username: true } } },
+    });
+    if (!post) throw new DirectoryError("POST_NOT_FOUND", `No post ${id} on this instance.`, 404);
+    return this.present(post);
   }
 }

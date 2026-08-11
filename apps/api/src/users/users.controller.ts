@@ -68,9 +68,9 @@ class SetStatusDto {
 export class UsersController {
   constructor(private readonly directory: UserDirectoryService) {}
 
-  private unwrap<T>(fn: () => T): T {
+  private async unwrap<T>(fn: () => Promise<T> | T): Promise<T> {
     try {
-      return fn();
+      return await fn();
     } catch (error) {
       if (error instanceof DirectoryError) {
         throw new HttpException({ error: { code: error.code, message: error.message } }, error.status);
@@ -80,54 +80,54 @@ export class UsersController {
   }
 
   @Get()
-  list() {
-    return { users: this.directory.list() };
+  async list() {
+    return { users: await this.directory.list() };
   }
 
   @Post()
-  create(@Body() body: CreateUserDto) {
-    return this.unwrap(() => ({ user: this.directory.create(body) }));
+  async create(@Body() body: CreateUserDto) {
+    return this.unwrap(async () => ({ user: await this.directory.create(body) }));
   }
 
   @Get(":username")
-  get(@Param("username") username: string) {
-    return this.unwrap(() => ({ user: this.directory.get(username) }));
+  async get(@Param("username") username: string) {
+    return this.unwrap(async () => ({ user: await this.directory.get(username) }));
   }
 
   @Patch(":username")
-  update(@Param("username") username: string, @Body() body: UpdateUserDto) {
-    return this.unwrap(() => ({ user: this.directory.update(username, body) }));
+  async update(@Param("username") username: string, @Body() body: UpdateUserDto) {
+    return this.unwrap(async () => ({ user: await this.directory.update(username, body) }));
   }
 
   /** Suspend or restore. System accounts refuse. */
   @Patch(":username/status")
-  setStatus(@Param("username") username: string, @Body() body: SetStatusDto) {
-    return this.unwrap(() => ({ user: this.directory.setStatus(username, body.status) }));
+  async setStatus(@Param("username") username: string, @Body() body: SetStatusDto) {
+    return this.unwrap(async () => ({ user: await this.directory.setStatus(username, body.status) }));
   }
 
   @Patch(":username/verification")
-  setVerification(@Param("username") username: string, @Body() body: SetVerificationDto) {
+  async setVerification(@Param("username") username: string, @Body() body: SetVerificationDto) {
     return this.unwrap(() => this.directory.setVerification(username, body.type, body.reason));
   }
 
   @Get(":username/verification/history")
-  history(@Param("username") username: string) {
-    return this.unwrap(() => ({ history: this.directory.historyFor(username) }));
+  async history(@Param("username") username: string) {
+    return this.unwrap(async () => ({ history: await this.directory.historyFor(username) }));
   }
 
   @Get(":username/affiliates")
-  affiliates(@Param("username") username: string) {
-    return this.unwrap(() => ({ affiliates: this.directory.affiliates(username) }));
+  async affiliates(@Param("username") username: string) {
+    return this.unwrap(async () => ({ affiliates: await this.directory.affiliates(username) }));
   }
 
   /** The organisation in the path affiliates the account in the body. */
   @Post(":username/affiliates")
-  affiliate(@Param("username") username: string, @Body() body: AffiliateDto) {
+  async affiliate(@Param("username") username: string, @Body() body: AffiliateDto) {
     return this.unwrap(() => this.directory.affiliate(username, body.username));
   }
 
   @Delete(":username/affiliation")
-  removeAffiliation(@Param("username") username: string) {
-    return this.unwrap(() => ({ user: this.directory.removeAffiliation(username) }));
+  async removeAffiliation(@Param("username") username: string) {
+    return this.unwrap(async () => ({ user: await this.directory.removeAffiliation(username) }));
   }
 }

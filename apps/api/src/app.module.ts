@@ -1,6 +1,7 @@
 import { Module } from "@nestjs/common";
 import { ThrottlerModule, ThrottlerGuard } from "@nestjs/throttler";
 import { APP_GUARD } from "@nestjs/core";
+import { DatabaseModule } from "./database/database.module";
 import { HealthModule } from "./health/health.module";
 import { AuthModule } from "./auth/auth.module";
 import { UsersModule } from "./users/users.module";
@@ -18,6 +19,7 @@ import { CommunityNotesModule } from "./notes/community-notes.module";
         limit: 120,
       },
     ]),
+    DatabaseModule,
     HealthModule,
     AuthModule,
     UsersModule,

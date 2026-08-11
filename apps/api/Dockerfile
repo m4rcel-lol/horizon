@@ -18,4 +18,6 @@ WORKDIR /app
 ENV NODE_ENV=production
 COPY --from=builder /app /app
 EXPOSE 3000
-CMD ["node", "apps/api/dist/main.js"]
+# Apply pending migrations before serving: a fresh deployment must build its own
+# schema, and an upgrade must not start against an older one.
+CMD ["sh", "-c", "npx prisma migrate deploy --schema packages/database/prisma/schema.prisma && node apps/api/dist/main.js"]
