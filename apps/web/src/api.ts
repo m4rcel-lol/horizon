@@ -161,6 +161,7 @@ export type ApiNotificationType =
   | "SYSTEM";
 
 export type ApiNotificationDetail =
+  | "FOLLOW_APPROVED"
   | "JOIN_REQUEST"
   | "JOIN_APPROVED"
   | "AUTOMATION_REQUEST"
@@ -186,6 +187,10 @@ export interface Relationship {
   following: boolean;
   followsYou: boolean;
   isSelf: boolean;
+  /** A follow of a private account, waiting on their approval. */
+  requested: boolean;
+  /** Whether their profile timeline is readable by the caller. */
+  canViewPosts: boolean;
 }
 
 export interface ApiUser {
@@ -322,9 +327,15 @@ export const api = {
     ),
   // Follows
   setFollow: (username: string, on: boolean) =>
-    request<{ user: ApiUser; following: boolean }>(
+    request<{ user: ApiUser; following: boolean; requested: boolean }>(
       `/users/${encodeURIComponent(username)}/follow`,
       { method: "PUT", body: JSON.stringify({ on }) },
+    ),
+  followRequests: () => request<{ users: ApiUser[] }>("/users/follow-requests/mine"),
+  resolveFollowRequest: (username: string, approve: boolean) =>
+    request<{ ok: true; approved: boolean }>(
+      `/users/follow-requests/${encodeURIComponent(username)}`,
+      { method: "POST", body: JSON.stringify({ approve }) },
     ),
   relationship: (username: string) =>
     request<Relationship>(`/users/${encodeURIComponent(username)}/relationship`),

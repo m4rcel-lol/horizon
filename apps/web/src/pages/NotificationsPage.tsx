@@ -12,6 +12,7 @@ import {
   NoteIcon,
   NotificationsIcon,
   RobotIcon,
+  LockIcon,
 } from "../icons";
 import { api, type ApiNotification } from "../api";
 import { Avatar, NameWithBadges } from "../components/Verification";
@@ -47,9 +48,16 @@ function describe(n: ApiNotification): { Icon: typeof LikeIcon; colour: string; 
     case "MENTION":
       return { Icon: QuoteIcon, colour: "var(--color-primary)", text: "mentioned you" };
     case "FOLLOW":
+      if (n.kind === "FOLLOW_APPROVED") {
+        return {
+          Icon: ProfileIcon,
+          colour: "var(--color-success, #00ba7c)",
+          text: "accepted your follow request",
+        };
+      }
       return { Icon: ProfileIcon, colour: "var(--color-primary)", text: "followed you" };
     case "FOLLOW_REQUEST":
-      return { Icon: ProfileIcon, colour: "var(--color-primary)", text: "asked to follow you" };
+      return { Icon: LockIcon, colour: "var(--color-primary)", text: "asked to follow you" };
     case "DM":
       return { Icon: MessagesIcon, colour: "var(--color-primary)", text: "sent you a message" };
     case "COMMUNITY":
