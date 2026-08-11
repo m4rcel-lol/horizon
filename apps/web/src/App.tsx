@@ -39,6 +39,7 @@ import {
   SettingsAppearancePage,
   SettingsAccountPage,
   SettingsPrivacyPage,
+  SettingsAutomationPage,
 } from "./pages/SettingsPage";
 
 /**
@@ -129,6 +130,7 @@ export default function App() {
           <Route path="appearance" element={<SettingsAppearancePage />} />
           <Route path="account" element={<SettingsAccountPage />} />
           <Route path="privacy" element={<SettingsPrivacyPage />} />
+          <Route path="automation" element={<SettingsAutomationPage />} />
         </Route>
         <Route path="/communities/:slug" element={<CommunityPage />} />
         <Route path="/communities/:slug/requests" element={<CommunityJoinRequestsPage />} />

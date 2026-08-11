@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { MediaIcon, PollIcon, EmojiIcon, ScheduleIcon } from "../icons";
 import { api, ApiError } from "../api";
 import { useSession } from "../hooks/useSession";
@@ -56,6 +56,16 @@ export function PostComposer({
   const [scheduleOpen, setScheduleOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [audience, setAudience] = useState<"everyone" | "community" | "mutuals">("everyone");
+  const [communitySlug, setCommunitySlug] = useState<string>("");
+  const [audienceOpen, setAudienceOpen] = useState(false);
+
+  const { data: communitiesData } = useQuery({
+    queryKey: ["communities", "mine", active?.username],
+    queryFn: () => api.communitiesFor(active!.username),
+    enabled: Boolean(active?.username),
+  });
+  const myCommunities = communitiesData?.communities ?? [];
 
   // The rail's Post button links to #composer; focus it on arrival.
   useEffect(() => {
@@ -91,6 +101,8 @@ export function PostComposer({
         ...(mediaIds.length ? { mediaIds } : {}),
         ...(poll ? { poll: { options: poll.options, durationMinutes: poll.minutes } } : {}),
         ...(scheduledFor ? { scheduledFor: new Date(scheduledFor).toISOString() } : {}),
+        visibility: audience === "mutuals" ? "FOLLOWERS" : "PUBLIC",
+        ...(audience === "community" && communitySlug ? { communitySlug } : {}),
       });
     },
     onSuccess: (result) => {
@@ -289,6 +301,79 @@ export function PostComposer({
             </button>
           </p>
         ) : null}
+
+        <div className="relative mt-1 mb-1">
+          <button
+            type="button"
+            className="text-[14px] font-bold link"
+            onClick={() => setAudienceOpen((o) => !o)}
+            aria-haspopup="listbox"
+            aria-expanded={audienceOpen}
+          >
+            {audience === "everyone"
+              ? "Everyone"
+              : audience === "mutuals"
+                ? "Mutuals only"
+                : communitySlug
+                  ? `Community · ${communitySlug}`
+                  : "Community"}
+            {" "}▾
+          </button>
+          {audienceOpen ? (
+            <div
+              role="listbox"
+              className="absolute left-0 top-full mt-1 z-30 w-[260px] rounded-2xl border shadow-xl overflow-hidden animate-pop-in"
+              style={{ background: "var(--color-bg)", borderColor: "var(--color-border)" }}
+            >
+              {(
+                [
+                  { id: "everyone", label: "Everyone", hint: "Public timeline" },
+                  { id: "community", label: "Community", hint: "Post into a community you joined" },
+                  { id: "mutuals", label: "Mutuals only", hint: "Only people who follow you back" },
+                ] as const
+              ).map((opt) => (
+                <button
+                  key={opt.id}
+                  type="button"
+                  role="option"
+                  className="w-full text-left px-4 py-3 hover:bg-[var(--color-bg-secondary)]"
+                  onClick={() => {
+                    setAudience(opt.id);
+                    if (opt.id !== "community") setAudienceOpen(false);
+                  }}
+                >
+                  <span className="block font-bold text-[15px]">{opt.label}</span>
+                  <span className="block text-[13px]" style={{ color: "var(--color-text-secondary)" }}>
+                    {opt.hint}
+                  </span>
+                </button>
+              ))}
+              {audience === "community" ? (
+                <div className="border-t px-3 py-2 max-h-40 overflow-y-auto" style={{ borderColor: "var(--color-border)" }}>
+                  {myCommunities.length === 0 ? (
+                    <p className="text-[13px] px-1 py-2" style={{ color: "var(--color-text-secondary)" }}>
+                      Join a community first.
+                    </p>
+                  ) : (
+                    myCommunities.map((c) => (
+                      <button
+                        key={c.id}
+                        type="button"
+                        className="w-full text-left px-2 py-2 rounded-lg text-[14px] hover:bg-[var(--color-bg-secondary)]"
+                        onClick={() => {
+                          setCommunitySlug(c.slug);
+                          setAudienceOpen(false);
+                        }}
+                      >
+                        {c.name}
+                      </button>
+                    ))
+                  )}
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+        </div>
 
         <div className="flex items-center justify-between pt-2">
           <div className="flex gap-1 relative" style={{ color: "var(--color-primary)" }}>

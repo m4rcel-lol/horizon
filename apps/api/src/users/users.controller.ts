@@ -199,6 +199,29 @@ export class UsersController {
     return this.unwrap(() => this.directory.affiliate(username, body.username));
   }
 
+  /** Mark this account as automated by another user (pending until they accept). */
+  @Post("automation/request")
+  async requestAutomation(
+    @Body() body: { managerUsername: string },
+    @CurrentUser() auth: AuthenticatedUser,
+  ) {
+    return this.unwrap(async () => ({
+      user: await this.directory.requestAutomation(auth.username, body.managerUsername),
+    }));
+  }
+
+  /** Manager accepts or declines an automation request. */
+  @Post(":username/automation")
+  async resolveAutomation(
+    @Param("username") username: string,
+    @Body() body: { approve: boolean },
+    @CurrentUser() auth: AuthenticatedUser,
+  ) {
+    return this.unwrap(async () => ({
+      user: await this.directory.resolveAutomation(auth.id, username, body.approve),
+    }));
+  }
+
   /** The affiliate may leave; their organisation, or an admin, may remove them. */
   @Delete(":username/affiliation")
   async removeAffiliation(@Param("username") username: string, @CurrentUser() auth: AuthenticatedUser) {

@@ -9,6 +9,7 @@ const sections = [
   { to: "/settings/appearance", label: "Appearance", description: "Theme and display" },
   { to: "/settings/account", label: "Account", description: "Sessions and account switching" },
   { to: "/settings/privacy", label: "Privacy", description: "Visibility and interactions" },
+  { to: "/settings/automation", label: "Automation", description: "Automated account management" },
 ];
 
 /** Shown only to accounts that hold the matching permission. */
@@ -156,9 +157,7 @@ export function SettingsAppearancePage() {
             }}
             aria-label={`Accent ${color}`}
             onClick={() => {
-              localStorage.setItem("horizon_accent", color);
-              document.documentElement.style.setProperty("--color-primary", color);
-              document.documentElement.style.setProperty("--color-primary-hover", color);
+              import("../theme").then(({ applyAccent }) => applyAccent(color));
             }}
           />
         ))}
@@ -168,7 +167,7 @@ export function SettingsAppearancePage() {
 }
 
 export function SettingsAccountPage() {
-  const { accounts, active, logout, logoutAll } = useSession();
+  const { accounts, active, logout, logoutAll, switchTo } = useSession();
 
   return (
     <div className="px-4 py-4">
@@ -214,12 +213,20 @@ export function SettingsAccountPage() {
                   </p>
                 </div>
                 {!isActive ? (
-                  <Link
-                    to={`/login?u=${encodeURIComponent(a.username)}`}
+                  <button
+                    type="button"
                     className="btn btn-outline text-[13px] !py-1.5 !px-3"
+                    onClick={async () => {
+                      try {
+                        await switchTo(a.userId);
+                        window.location.href = "/home";
+                      } catch {
+                        window.location.href = `/login?u=${encodeURIComponent(a.username)}`;
+                      }
+                    }}
                   >
                     Switch
-                  </Link>
+                  </button>
                 ) : null}
                 <button type="button" className="text-[13px] link" onClick={() => logout(a.userId)}>
                   Remove
@@ -348,6 +355,78 @@ export function SettingsPrivacyPage() {
 
       {message ? (
         <p className="mt-4 text-[14px]" style={{ color: "var(--color-text-secondary)" }} role="status">
+          {message}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+
+export function SettingsAutomationPage() {
+  const { active, refresh } = useSession();
+  const [manager, setManager] = useState("");
+  const [message, setMessage] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  async function request() {
+    if (!manager.trim()) return;
+    setBusy(true);
+    setMessage(null);
+    try {
+      const { api } = await import("../api");
+      await api.requestAutomation(manager.trim().replace(/^@/, ""));
+      await refresh();
+      setMessage(`Request sent to @${manager.trim().replace(/^@/, "")}. They must accept before the automated label appears.`);
+      setManager("");
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : "Could not send request.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="px-4 py-4">
+      <h2 className="text-[20px] font-extrabold mb-1">Automation</h2>
+      <p className="text-[14px] mb-6" style={{ color: "var(--color-text-secondary)" }}>
+        Mark this account as automated by another person. They receive a request; after they accept,
+        your profile shows a robot label and “Automated by @username”.
+      </p>
+
+      {active?.automatedBy && !active.automatedPending ? (
+        <p className="mb-4 text-[15px] flex items-center gap-2">
+          <span aria-hidden="true">🤖</span>
+          Automated by{" "}
+          <a href={`/${active.automatedBy.username}`} className="link font-bold">
+            @{active.automatedBy.username}
+          </a>
+        </p>
+      ) : null}
+
+      {active?.automatedPending ? (
+        <p className="mb-4 text-[14px]" style={{ color: "var(--color-text-secondary)" }}>
+          Automation request pending acceptance.
+        </p>
+      ) : null}
+
+      <label className="x-label" htmlFor="automation-manager">
+        Manager username
+      </label>
+      <div className="flex gap-2">
+        <input
+          id="automation-manager"
+          className="x-field flex-1"
+          placeholder="username"
+          value={manager}
+          onChange={(e) => setManager(e.target.value)}
+        />
+        <button type="button" className="btn btn-primary" disabled={busy || !manager.trim()} onClick={request}>
+          {busy ? "Sending…" : "Request"}
+        </button>
+      </div>
+      {message ? (
+        <p className="mt-3 text-[14px]" style={{ color: "var(--color-text-secondary)" }} role="status">
           {message}
         </p>
       ) : null}

@@ -87,9 +87,15 @@ export class AuthController {
   async register(@Body() body: RegisterDto, @Req() req: Request, @Res({ passthrough: true }) res: Response) {
     return this.unwrap(async () => {
       const user = await this.auth.register(body);
-      const { token } = await this.auth.createSession(user.id, this.clientMeta(req));
+      const { token, expiresAt } = await this.auth.createSession(user.id, this.clientMeta(req));
       this.setSessionCookie(res, token);
-      return { user: await this.directory.get(user.username) };
+      // sessionToken is stored in the device vault so the account switcher can
+      // re-activate this session in one click without asking for the password.
+      return {
+        user: await this.directory.get(user.username),
+        sessionToken: token,
+        expiresAt: expiresAt.toISOString(),
+      };
     });
   }
 
@@ -98,9 +104,40 @@ export class AuthController {
   async login(@Body() body: LoginDto, @Req() req: Request, @Res({ passthrough: true }) res: Response) {
     return this.unwrap(async () => {
       const user = await this.auth.verifyCredentials(body.identifier, body.password);
-      const { token } = await this.auth.createSession(user.id, this.clientMeta(req));
+      const { token, expiresAt } = await this.auth.createSession(user.id, this.clientMeta(req));
       this.setSessionCookie(res, token, body.remember ?? true);
-      return { user: await this.directory.get(user.username) };
+      return {
+        user: await this.directory.get(user.username),
+        sessionToken: token,
+        expiresAt: expiresAt.toISOString(),
+      };
+    });
+  }
+
+  /**
+   * One-click account switch: the device vault holds the session token from a
+   * prior "Stay signed in" login. We re-attach that session as the HttpOnly
+   * cookie — no password prompt.
+   */
+  @Public()
+  @Post("switch")
+  async switchAccount(
+    @Body() body: { sessionToken?: string },
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    return this.unwrap(async () => {
+      const token = body.sessionToken?.trim();
+      if (!token) {
+        throw new DirectoryError("INVALID_SESSION", "Missing session token.", 400);
+      }
+      const resolved = await this.auth.resolveSession(token);
+      if (!resolved) {
+        throw new DirectoryError("INVALID_SESSION", "That session has expired. Sign in again.", 401);
+      }
+      this.setSessionCookie(res, token, true);
+      return {
+        user: await this.directory.get(resolved.user.username),
+      };
     });
   }
 

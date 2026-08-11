@@ -516,6 +516,65 @@ export class UserDirectoryService implements OnModuleInit {
 
 
   /** True when the account holds an administrator or owner role. */
+
+  /**
+   * This account asks to be marked automated-by @manager.
+   * Manager must accept before the robot badge shows.
+   */
+  async requestAutomation(username: string, managerUsername: string) {
+    const user = await this.row(username);
+    this.refuseIfSystem(user, "edited");
+    if (user.username.toLowerCase() === managerUsername.toLowerCase()) {
+      throw new DirectoryError("INVALID", "An account cannot automate itself.", 400);
+    }
+    const manager = await this.row(managerUsername);
+    if (manager.isSystem) {
+      throw new DirectoryError("INVALID", "System accounts cannot manage automation.", 400);
+    }
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: { automatedById: manager.id, automatedPending: true },
+    });
+    try {
+      await this.prisma.notification.create({
+        data: {
+          recipientId: manager.id,
+          actorId: user.id,
+          type: "SYSTEM",
+          data: {
+            kind: "AUTOMATION_REQUEST",
+            fromUsername: user.username,
+          },
+        },
+      });
+    } catch {
+      /* non-fatal */
+    }
+    return this.get(username);
+  }
+
+  async resolveAutomation(managerId: string, automatedUsername: string, approve: boolean) {
+    const automated = await this.row(automatedUsername);
+    if (!automated.automatedById || automated.automatedById !== managerId) {
+      throw new DirectoryError("NOT_FOUND", "No pending automation request for you.", 404);
+    }
+    if (!automated.automatedPending && approve) {
+      return this.get(automatedUsername);
+    }
+    if (approve) {
+      await this.prisma.user.update({
+        where: { id: automated.id },
+        data: { automatedPending: false },
+      });
+    } else {
+      await this.prisma.user.update({
+        where: { id: automated.id },
+        data: { automatedById: null, automatedPending: false },
+      });
+    }
+    return this.get(automatedUsername);
+  }
+
   private async userIsAdmin(userId: string): Promise<boolean> {
     const row = await this.prisma.userRole.findFirst({
       where: {

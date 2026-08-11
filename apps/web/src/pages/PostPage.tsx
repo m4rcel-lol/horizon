@@ -1,3 +1,4 @@
+import { SeoHead } from "../components/SeoHead";
 import { useState } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -58,6 +59,14 @@ export function PostPage() {
 
   return (
     <div>
+      <SeoHead
+        title={post ? `${post.author?.displayName ?? post.authorUsername}: ${post.content.slice(0, 80)}` : "Post"}
+        description={post?.content?.slice(0, 160) || "A post on Horizon"}
+        url={post ? `/${post.authorUsername}/status/${post.id}` : undefined}
+        image={post?.author?.avatarUrl || "/assets/logo.svg"}
+        type="article"
+      />
+
       <header className="x-header gap-6">
         <button type="button" onClick={() => navigate(-1)} className="icon-btn -ml-2" aria-label="Back">
           <ArrowLeftIcon className="w-5 h-5" />

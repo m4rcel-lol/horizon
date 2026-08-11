@@ -228,9 +228,11 @@ export class PostsService {
     content: string;
     replyToId?: string;
     quoteOfId?: string;
-    viewerId?: string | null;
     mediaIds?: string[];
     poll?: { options: string[]; durationMinutes: number };
+    viewerId?: string | null;
+    visibility?: "PUBLIC" | "FOLLOWERS" | "MENTIONED" | "PRIVATE";
+    communitySlug?: string;
   }): Promise<PresentedPost> {
     // Reject unknown authors rather than storing a dangling handle.
     const author = await this.directory.get(input.author);
@@ -277,10 +279,35 @@ export class PostsService {
           content: input.content,
           replyToId: input.replyToId ?? null,
           quoteOfId: input.quoteOfId ?? null,
+          visibility: input.visibility ?? "PUBLIC",
           type: input.replyToId ? "REPLY" : input.quoteOfId ? "QUOTE" : "ORIGINAL",
         },
         select: POST_SELECT,
       });
+
+      if (input.communitySlug) {
+        const community = await tx.community.findUnique({
+          where: { slug: input.communitySlug },
+          select: { id: true },
+        });
+        if (community) {
+          const member = await tx.communityMember.findUnique({
+            where: {
+              communityId_userId: { communityId: community.id, userId: author.id },
+            },
+            select: { userId: true },
+          });
+          if (member) {
+            await tx.communityPost.create({
+              data: { communityId: community.id, postId: created.id },
+            });
+            await tx.community.update({
+              where: { id: community.id },
+              data: { postCount: { increment: 1 } },
+            });
+          }
+        }
+      }
 
       for (const [position, mediaId] of mediaIds.entries()) {
         await tx.postMedia.create({ data: { postId: created.id, mediaId, position } });

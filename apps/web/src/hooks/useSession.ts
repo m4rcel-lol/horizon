@@ -46,22 +46,24 @@ export function useSession() {
   );
 
   /** Remember this account on this device so the switcher can offer it. */
-  const remember = useCallback((user: ApiUser) => {
-    saveAccount(
-      {
-        userId: user.id,
-        username: user.username,
-        displayName: user.displayName,
-        avatarUrl: user.avatarUrl ?? null,
-        // Not a credential: the real session is an HttpOnly cookie the browser
-        // holds and JavaScript cannot see.
-        token: "cookie",
-        expiresAt: new Date(Date.now() + 30 * 86400_000).toISOString(),
-        lastUsedAt: new Date().toISOString(),
-      },
-      true,
-    );
-  }, []);
+  const remember = useCallback(
+    (user: ApiUser, sessionToken?: string, expiresAt?: string) => {
+      saveAccount(
+        {
+          userId: user.id,
+          username: user.username,
+          displayName: user.displayName,
+          avatarUrl: user.avatarUrl ?? null,
+          // Opaque session token from the server — enables one-click switch.
+          token: sessionToken || "cookie",
+          expiresAt: expiresAt || new Date(Date.now() + 30 * 86400_000).toISOString(),
+          lastUsedAt: new Date().toISOString(),
+        },
+        true,
+      );
+    },
+    [],
+  );
 
   const signIn = useMutation({
     mutationFn: ({
@@ -73,9 +75,9 @@ export function useSession() {
       password: string;
       remember: boolean;
     }) => api.login(identifier, password, remember),
-    onSuccess: ({ user }) => {
-      remember(user);
-      queryClient.setQueryData(["session"], { user });
+    onSuccess: (data) => {
+      remember(data.user, data.sessionToken, data.expiresAt);
+      queryClient.setQueryData(["session"], { user: data.user });
       queryClient.invalidateQueries();
       // Permissions arrive with /auth/me, which login does not return.
       refetch();
@@ -84,9 +86,9 @@ export function useSession() {
 
   const signUp = useMutation({
     mutationFn: api.register,
-    onSuccess: ({ user }) => {
-      remember(user);
-      queryClient.setQueryData(["session"], { user });
+    onSuccess: (data) => {
+      remember(data.user, data.sessionToken, data.expiresAt);
+      queryClient.setQueryData(["session"], { user: data.user });
       queryClient.invalidateQueries();
     },
   });
@@ -98,6 +100,22 @@ export function useSession() {
       queryClient.invalidateQueries();
     },
   });
+
+  /** One-click switch using the vault session token — no password. */
+  const switchTo = useCallback(
+    async (userId: string) => {
+      const account = listAccounts().find((a) => a.userId === userId);
+      if (!account || !account.token || account.token === "cookie") {
+        throw new Error("Sign in again to enable one-click switching for this account.");
+      }
+      const { user } = await api.switchAccount(account.token);
+      remember(user, account.token, account.expiresAt);
+      queryClient.setQueryData(["session"], { user });
+      queryClient.invalidateQueries();
+      return user;
+    },
+    [queryClient, remember],
+  );
 
   const logout = useCallback(
     async (userId?: string) => {
@@ -135,6 +153,7 @@ export function useSession() {
     }) => (await signUp.mutateAsync(input)).user,
     logout,
     logoutAll,
+    switchTo,
     refresh: refetch,
   };
 }

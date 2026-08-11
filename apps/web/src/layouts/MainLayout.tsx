@@ -48,7 +48,7 @@ export function MainLayout() {
   const moreRef = useRef<HTMLLIElement>(null);
   const accountRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
-  const { accounts, active, logout, isAuthenticated, can } = useSession();
+  const { accounts, active, logout, isAuthenticated, can, switchTo } = useSession();
   // Driven by the caller's own permissions, which only ever describe them —
   // the public user object must not say who the administrators are.
   const canAdminister =
@@ -219,12 +219,24 @@ export function MainLayout() {
                           Accounts
                         </div>
                         {accounts.map((a) => (
-                          <Link
+                          <button
                             key={a.userId}
-                            to={active?.id === a.userId ? `/${a.username}` : `/login?u=${encodeURIComponent(a.username)}`}
+                            type="button"
                             role="menuitem"
                             className="flex items-center gap-3 w-full px-4 py-2.5 hover:bg-[var(--color-bg-secondary)] text-left"
-                            onClick={() => setMoreOpen(false)}
+                            onClick={async () => {
+                              setMoreOpen(false);
+                              if (active?.id === a.userId) {
+                                navigate(`/${a.username}`);
+                                return;
+                              }
+                              try {
+                                await switchTo(a.userId);
+                                navigate("/home");
+                              } catch {
+                                navigate(`/login?u=${encodeURIComponent(a.username)}`);
+                              }
+                            }}
                           >
                             <img
                               src={a.avatarUrl || "/assets/default-avatar.svg"}
@@ -240,10 +252,10 @@ export function MainLayout() {
                                 style={{ color: "var(--color-text-secondary)" }}
                               >
                                 @{a.username}
-                                {active?.id === a.userId ? " · Active" : " · Sign in to switch"}
+                                {active?.id === a.userId ? " · Active" : ""}
                               </span>
                             </span>
-                          </Link>
+                          </button>
                         ))}
                       </>
                     ) : null}
@@ -325,16 +337,24 @@ export function MainLayout() {
                         Accounts
                       </div>
                       {accounts.map((a) => (
-                        <Link
+                        <button
                           key={a.userId}
-                          to={
-                            active?.id === a.userId
-                              ? `/${a.username}`
-                              : `/login?u=${encodeURIComponent(a.username)}`
-                          }
+                          type="button"
                           role="menuitem"
                           className="flex items-center gap-3 w-full px-4 py-2.5 hover:bg-[var(--color-bg-secondary)] text-left"
-                          onClick={() => setAccountOpen(false)}
+                          onClick={async () => {
+                            setAccountOpen(false);
+                            if (active?.id === a.userId) {
+                              navigate(`/${a.username}`);
+                              return;
+                            }
+                            try {
+                              await switchTo(a.userId);
+                              navigate("/home");
+                            } catch {
+                              navigate(`/login?u=${encodeURIComponent(a.username)}`);
+                            }
+                          }}
                         >
                           <img
                             src={a.avatarUrl || "/assets/default-avatar.svg"}
@@ -351,7 +371,7 @@ export function MainLayout() {
                               {active?.id === a.userId ? " · Active" : ""}
                             </span>
                           </span>
-                        </Link>
+                        </button>
                       ))}
                       <div className="border-t" style={{ borderColor: "var(--color-border)" }}>
                         <Link

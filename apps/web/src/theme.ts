@@ -77,3 +77,31 @@ export function useTheme() {
 
   return { theme, preference, setPreference, toggle };
 }
+
+
+const ACCENT_KEY = "horizon_accent";
+const DEFAULT_ACCENT = "#1d9bf0";
+
+export function getStoredAccent(): string {
+  try {
+    return localStorage.getItem(ACCENT_KEY) || DEFAULT_ACCENT;
+  } catch {
+    return DEFAULT_ACCENT;
+  }
+}
+
+export function applyAccent(color: string) {
+  const root = document.documentElement;
+  root.style.setProperty("--color-primary", color);
+  root.style.setProperty("--color-primary-hover", color);
+  root.style.setProperty("--color-btn", color);
+  try {
+    localStorage.setItem(ACCENT_KEY, color);
+  } catch {
+    /* private mode */
+  }
+}
+
+export function initAccent() {
+  applyAccent(getStoredAccent());
+}

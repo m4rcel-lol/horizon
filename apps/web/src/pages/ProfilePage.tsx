@@ -12,6 +12,7 @@ import { FollowsYouChip } from "../components/FollowsYouChip";
 import { ProfileMenu } from "../components/ProfileMenu";
 import { ProfileCommunities } from "../components/CommunityCard";
 import { PageLoader } from "../components/LoadingSpinner";
+import { SeoHead } from "../components/SeoHead";
 import { RichText } from "../components/RichText";
 import { useSession } from "../hooks/useSession";
 
@@ -61,6 +62,13 @@ export function ProfilePage() {
 
   return (
     <div className="animate-fade-in">
+      <SeoHead
+        title={user ? `${user.displayName} (@${user.username})` : `@${handle}`}
+        description={user?.bio || `@${handle} on Horizon`}
+        url={`/${user?.username ?? handle}`}
+        image={user?.avatarUrl || "/assets/default-avatar.svg"}
+        type="profile"
+      />
       <header className="x-header gap-6">
         <button type="button" onClick={() => navigate(-1)} className="icon-btn -ml-2" aria-label="Back">
           <ArrowLeftIcon className="w-5 h-5" />
@@ -275,9 +283,13 @@ export function ProfilePage() {
         }}
         displayName={user?.displayName ?? active?.displayName ?? ""}
         bio={user?.bio ?? ""}
+        website={user?.website ?? ""}
+        location={user?.location ?? ""}
+        pronouns={user?.pronouns ?? ""}
+        birthday={user?.birthday ?? ""}
         avatarUrl={avatarSrc}
         bannerUrl={bannerSrc}
-        onSave={async ({ displayName, bio, avatarFile, bannerFile }) => {
+        onSave={async ({ displayName, bio, website, location, pronouns, birthday, avatarFile, bannerFile }) => {
           if (!active?.username) return;
           setSaveError(null);
           setSaving(true);

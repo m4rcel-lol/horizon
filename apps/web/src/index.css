@@ -126,6 +126,10 @@ body {
 
   /* Equal-width tab strip with the rounded active underline */
   .x-tabs {
+    /* Opaque so sticky tabs do not show posts scrolling underneath. */
+    background: var(--color-bg);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
     @apply flex border-b;
     border-color: var(--color-border);
   }

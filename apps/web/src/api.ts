@@ -218,12 +218,20 @@ export const api = {
   // Auth
   me: () => request<{ user: ApiUser | null; permissions: string[] }>("/auth/me"),
   login: (identifier: string, password: string, remember = true) =>
-    request<{ user: ApiUser }>("/auth/login", {
+    request<{ user: ApiUser; sessionToken?: string; expiresAt?: string }>("/auth/login", {
       method: "POST",
       body: JSON.stringify({ identifier, password, remember }),
     }),
   register: (input: { username: string; email: string; password: string; displayName?: string }) =>
-    request<{ user: ApiUser }>("/auth/register", { method: "POST", body: JSON.stringify(input) }),
+    request<{ user: ApiUser; sessionToken?: string; expiresAt?: string }>("/auth/register", {
+      method: "POST",
+      body: JSON.stringify(input),
+    }),
+  switchAccount: (sessionToken: string) =>
+    request<{ user: ApiUser }>("/auth/switch", {
+      method: "POST",
+      body: JSON.stringify({ sessionToken }),
+    }),
   logout: () => request<{ ok: boolean }>("/auth/logout", { method: "POST" }),
   sessions: () =>
     request<{ current: string; sessions: { id: string; userAgent: string | null; ipAddress: string | null; createdAt: string; lastUsedAt: string }[] }>(
@@ -235,6 +243,16 @@ export const api = {
   getUser: (username: string) => request<{ user: ApiUser }>(`/users/${encodeURIComponent(username)}`),
   createUser: (body: { username: string; displayName: string; bio?: string; verification?: VerificationType }) =>
     request<{ user: ApiUser }>("/users", { method: "POST", body: JSON.stringify(body) }),
+  requestAutomation: (managerUsername: string) =>
+    request<{ user: ApiUser }>("/users/automation/request", {
+      method: "POST",
+      body: JSON.stringify({ managerUsername }),
+    }),
+  resolveAutomation: (username: string, approve: boolean) =>
+    request<{ user: ApiUser }>(`/users/${encodeURIComponent(username)}/automation`, {
+      method: "POST",
+      body: JSON.stringify({ approve }),
+    }),
   updateUser: (
     username: string,
     body: {
@@ -379,6 +397,10 @@ export const api = {
       poll?: { options: string[]; durationMinutes: number };
       /** ISO timestamp. Present means the response is a schedule, not a post. */
       scheduledFor?: string;
+      /** PUBLIC | FOLLOWERS (mutuals-style) */
+      visibility?: "PUBLIC" | "FOLLOWERS";
+      /** Post into this community (slug). */
+      communitySlug?: string;
     },
   ) =>
     request<{ post?: ApiPost; scheduled?: ScheduledPost }>("/posts", {

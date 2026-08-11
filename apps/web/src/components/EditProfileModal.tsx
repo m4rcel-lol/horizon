@@ -10,11 +10,22 @@ type Props = {
   onClose: () => void;
   displayName: string;
   bio?: string;
+  website?: string | null;
+  location?: string | null;
+  pronouns?: string | null;
+  birthday?: string | null;
   avatarUrl?: string | null;
   bannerUrl?: string | null;
+  communities?: { slug: string; name: string }[];
+  pinnedCommunitySlug?: string | null;
   onSave?: (payload: {
     displayName: string;
     bio: string;
+    website?: string;
+    location?: string;
+    pronouns?: string;
+    birthday?: string;
+    pinnedCommunitySlug?: string | null;
     avatarFile?: File | null;
     bannerFile?: File | null;
   }) => void | Promise<void>;
@@ -29,12 +40,23 @@ export function EditProfileModal({
   onClose,
   displayName: initialName,
   bio: initialBio = "",
+  website: initialWebsite = "",
+  location: initialLocation = "",
+  pronouns: initialPronouns = "",
+  birthday: initialBirthday = "",
   avatarUrl,
   bannerUrl,
+  communities = [],
+  pinnedCommunitySlug: initialPinned = null,
   onSave,
 }: Props) {
   const [displayName, setDisplayName] = useState(initialName);
   const [bio, setBio] = useState(initialBio);
+  const [website, setWebsite] = useState(initialWebsite || "");
+  const [location, setLocation] = useState(initialLocation || "");
+  const [pronouns, setPronouns] = useState(initialPronouns || "");
+  const [birthday, setBirthday] = useState(initialBirthday || "");
+  const [pinnedCommunitySlug, setPinnedCommunitySlug] = useState(initialPinned || "");
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [bannerFile, setBannerFile] = useState<File | null>(null);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
@@ -48,12 +70,17 @@ export function EditProfileModal({
     if (!open) return;
     setDisplayName(initialName);
     setBio(initialBio);
+    setWebsite(initialWebsite || "");
+    setLocation(initialLocation || "");
+    setPronouns(initialPronouns || "");
+    setBirthday(initialBirthday || "");
+    setPinnedCommunitySlug(initialPinned || "");
     setAvatarFile(null);
     setBannerFile(null);
     setAvatarPreview(null);
     setBannerPreview(null);
     setError(null);
-  }, [open, initialName, initialBio]);
+  }, [open, initialName, initialBio, initialWebsite, initialLocation, initialPronouns, initialBirthday, initialPinned]);
 
   useEffect(() => {
     return () => {
@@ -98,6 +125,11 @@ export function EditProfileModal({
       await onSave?.({
         displayName: displayName.trim(),
         bio: bio.trim(),
+        website: website.trim(),
+        location: location.trim(),
+        pronouns: pronouns.trim(),
+        birthday: birthday.trim() || undefined,
+        pinnedCommunitySlug: pinnedCommunitySlug || null,
         avatarFile,
         bannerFile,
       });
@@ -223,6 +255,31 @@ export function EditProfileModal({
               maxLength={500}
               onChange={(e) => setBio(e.target.value)}
             />
+          </div>
+          <div>
+            <label htmlFor="edit-pronouns" className="x-label">Pronouns</label>
+            <input id="edit-pronouns" className="x-field" maxLength={40} value={pronouns} onChange={(e) => setPronouns(e.target.value)} placeholder="they/them" />
+          </div>
+          <div>
+            <label htmlFor="edit-website" className="x-label">Website</label>
+            <input id="edit-website" className="x-field" maxLength={100} value={website} onChange={(e) => setWebsite(e.target.value)} placeholder="https://" />
+          </div>
+          <div>
+            <label htmlFor="edit-location" className="x-label">Location</label>
+            <input id="edit-location" className="x-field" maxLength={50} value={location} onChange={(e) => setLocation(e.target.value)} />
+          </div>
+          <div>
+            <label htmlFor="edit-birthday" className="x-label">Birthday</label>
+            <input id="edit-birthday" type="date" className="x-field" value={birthday} onChange={(e) => setBirthday(e.target.value)} />
+          </div>
+          <div>
+            <label htmlFor="edit-pinned-community" className="x-label">Pinned community</label>
+            <select id="edit-pinned-community" className="x-field" value={pinnedCommunitySlug} onChange={(e) => setPinnedCommunitySlug(e.target.value)}>
+              <option value="">None</option>
+              {communities.map((c) => (
+                <option key={c.slug} value={c.slug}>{c.name}</option>
+              ))}
+            </select>
           </div>
           {error ? (
             <p className="text-[14px] text-red-500" role="alert">

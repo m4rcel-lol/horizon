@@ -11,6 +11,12 @@
       // Preference: light | dark | system (default system).
       (function () {
         try {
+          var accent = localStorage.getItem("horizon_accent");
+          if (accent) {
+            document.documentElement.style.setProperty("--color-primary", accent);
+            document.documentElement.style.setProperty("--color-primary-hover", accent);
+            document.documentElement.style.setProperty("--color-btn", accent);
+          }
           var saved = localStorage.getItem("horizon:theme");
           var dark;
           if (saved === "dark") dark = true;

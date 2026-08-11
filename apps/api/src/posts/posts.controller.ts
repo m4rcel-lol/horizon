@@ -5,6 +5,7 @@ import {
   IsArray,
   IsBoolean,
   IsDateString,
+  IsIn,
   IsInt,
   IsOptional,
   IsString,
@@ -71,6 +72,16 @@ class CreatePostDto {
   @IsString()
   @Length(1, 64)
   quoteOfId?: string;
+
+  @IsOptional()
+  @IsIn(["PUBLIC", "FOLLOWERS", "MENTIONED", "PRIVATE"])
+  visibility?: "PUBLIC" | "FOLLOWERS" | "MENTIONED" | "PRIVATE";
+
+  /** Post into this community (by slug). */
+  @IsOptional()
+  @IsString()
+  @Length(1, 60)
+  communitySlug?: string;
 }
 
 class SetFlagDto {
@@ -162,6 +173,8 @@ export class PostsController {
           mediaIds: body.mediaIds,
           poll: body.poll,
           viewerId: auth.id,
+          visibility: body.visibility,
+          communitySlug: body.communitySlug,
         }),
       };
     });
