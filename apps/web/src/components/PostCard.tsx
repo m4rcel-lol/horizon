@@ -3,7 +3,7 @@ import type { ApiPost } from "../api";
 import { Avatar, NameWithBadges } from "./Verification";
 import { CommunityNoteCard } from "./CommunityNote";
 import { PostActions } from "./PostActions";
-import { RepostIcon } from "../icons";
+import { CommunitiesIcon, RepostIcon } from "../icons";
 import { PostMediaGrid, PostPoll } from "./PostMedia";
 import { RichText } from "./RichText";
 
@@ -97,6 +97,7 @@ export function PostCard({
   ratingNote = false,
   onReply,
   onQuote,
+  showCommunity = true,
 }: {
   post: ApiPost;
   /** Full view: larger type, timestamp on its own line, notes rateable. */
@@ -105,6 +106,8 @@ export function PostCard({
   ratingNote?: boolean;
   onReply?: (post: ApiPost) => void;
   onQuote?: (post: ApiPost) => void;
+  /** Off on a community's own page, where the line would repeat on every row. */
+  showCommunity?: boolean;
 }) {
   const navigate = useNavigate();
   const author = post.author;
@@ -134,6 +137,41 @@ export function PostCard({
       </Link>
     </p>
   ) : null;
+
+  // Where the post was filed, under everything else. Suppressed on the
+  // community's own page, where every row would carry the same line.
+  const communityFooter =
+    showCommunity && post.community ? (
+      <Link
+        to={`/communities/${post.community.slug}`}
+        onClick={(event) => event.stopPropagation()}
+        className="mt-2 inline-flex items-center gap-1.5 text-[13px] hover:underline"
+        style={{ color: "var(--color-text-secondary)" }}
+      >
+        from
+        {post.community.avatarUrl ? (
+          <img
+            src={post.community.avatarUrl}
+            alt=""
+            className="object-cover shrink-0"
+            style={{ width: 16, height: 16, borderRadius: 4 }}
+          />
+        ) : (
+          <span
+            className="flex items-center justify-center shrink-0"
+            style={{
+              width: 16,
+              height: 16,
+              borderRadius: 4,
+              background: "var(--color-bg-secondary)",
+            }}
+          >
+            <CommunitiesIcon className="w-3 h-3" />
+          </span>
+        )}
+        <span className="truncate">{post.community.name}</span>
+      </Link>
+    ) : null;
 
   const body = (
     <>
@@ -168,6 +206,8 @@ export function PostCard({
         onReply={onReply ?? (() => navigate(permalink))}
         onQuote={onQuote ?? (() => navigate(permalink))}
       />
+
+      {communityFooter}
     </>
   );
 

@@ -41,6 +41,14 @@ export interface PresentedPost {
    * it. The card shows "@x reposted" above the original author.
    */
   repostedBy: { username: string; displayName: string } | null;
+  /**
+   * The community it was posted into, for the "from <community>" footer.
+   *
+   * The join table allows a post in several communities, but composing only
+   * ever files it under one, so the card shows the first and the shape stays
+   * a single value rather than a list nothing renders.
+   */
+  community: { slug: string; name: string; avatarUrl: string | null } | null;
 }
 
 export interface PresentedPoll {
@@ -73,6 +81,11 @@ const POST_SELECT = {
       options: { orderBy: { position: "asc" }, select: { id: true, text: true, voteCount: true } },
     },
   },
+  communityPosts: {
+    take: 1,
+    orderBy: { createdAt: "asc" },
+    select: { community: { select: { slug: true, name: true, avatarUrl: true } } },
+  },
 } as const;
 
 type PostRow = {
@@ -93,6 +106,7 @@ type PostRow = {
     expiresAt: Date;
     options: { id: string; text: string; voteCount: number }[];
   } | null;
+  communityPosts: { community: { slug: string; name: string; avatarUrl: string | null } }[];
 };
 
 /** Posts, stored in Postgres. */
@@ -215,6 +229,7 @@ export class PostsService {
       media: await this.mediaService.describe(post.media.map((m) => m.mediaId)),
       poll: post.poll ? await this.presentPoll(post.poll, viewerId) : null,
       repostedBy: null,
+      community: post.communityPosts[0]?.community ?? null,
     };
   }
 
