@@ -29,10 +29,19 @@ const navItems = [
   { to: "/profile", label: "Profile", icon: ProfileIcon },
 ];
 
+/** Roughly what the More menu occupies; used only to choose a direction. */
+const MORE_MENU_HEIGHT = 360;
+
 export function MainLayout() {
   const [moreOpen, setMoreOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  /**
+   * The More menu opens downward. On a short window there may not be room, and
+   * a menu running off the bottom of the screen is unusable — so it flips up
+   * only when it genuinely does not fit and there is more space above.
+   */
+  const [moreDropsUp, setMoreDropsUp] = useState(false);
   const moreRef = useRef<HTMLLIElement>(null);
   const accountRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
@@ -97,7 +106,16 @@ export function MainLayout() {
                   className="nav-item w-full"
                   aria-haspopup="menu"
                   aria-expanded={moreOpen}
-                  onClick={() => setMoreOpen((o) => !o)}
+                  onClick={() => {
+                    // Decide the direction from where the button actually is,
+                    // before the menu renders.
+                    const rect = moreRef.current?.getBoundingClientRect();
+                    if (rect) {
+                      const below = window.innerHeight - rect.bottom;
+                      setMoreDropsUp(below < MORE_MENU_HEIGHT && rect.top > below);
+                    }
+                    setMoreOpen((o) => !o);
+                  }}
                 >
                   <MoreIcon className="w-[26.25px] h-[26.25px] shrink-0" />
                   <span className="hidden xl:inline pr-4">More</span>
@@ -106,7 +124,9 @@ export function MainLayout() {
                 {moreOpen ? (
                   <div
                     role="menu"
-                    className="absolute left-0 bottom-full mb-1 w-[280px] max-w-[calc(100vw-2rem)] rounded-2xl border shadow-xl z-50 overflow-hidden"
+                    className={`absolute left-0 w-[280px] max-w-[calc(100vw-2rem)] rounded-2xl border shadow-xl z-50 overflow-hidden ${
+                      moreDropsUp ? "bottom-full mb-1" : "top-full mt-1"
+                    }`}
                     style={{
                       background: "var(--color-bg)",
                       borderColor: "var(--color-border)",
