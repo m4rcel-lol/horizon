@@ -1,7 +1,7 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { createHash, randomBytes } from "node:crypto";
 import * as argon2 from "argon2";
-import { COMMUNITY_NOTES_ACCOUNT } from "@horizon/shared";
+import { RESERVED_USERNAMES } from "@horizon/shared";
 import { PrismaService } from "../database/prisma.service";
 import { DirectoryError } from "../users/directory-error";
 
@@ -11,33 +11,23 @@ export const SESSION_IDLE_DAYS = 30;
 export const SESSION_ABSOLUTE_DAYS = 90;
 export const SESSION_COOKIE = "horizon_session";
 
-const RESERVED_USERNAMES = new Set([
-  "admin",
-  "administrator",
-  "api",
-  "about",
-  "explore",
-  "home",
-  "login",
-  "logout",
-  "messages",
-  "notifications",
-  "notes",
-  "settings",
-  "setup",
-  "register",
-  "signup",
-  "search",
-  "support",
-  "help",
-  "docs",
-  "privacy",
-  "terms",
-  "root",
-  "system",
-  "horizon",
-  COMMUNITY_NOTES_ACCOUNT.username.toLowerCase(),
-]);
+/**
+ * What a suspended account is told when it tries to sign in.
+ *
+ * "This account is suspended." on its own leaves someone with no idea what
+ * happened or whether it ever ends — the reason and the end date are the whole
+ * difference between a message and a wall.
+ */
+function describeSuspension(user: {
+  suspensionReason: string | null;
+  suspendedUntil: Date | null;
+}): string {
+  const until = user.suspendedUntil
+    ? `until ${user.suspendedUntil.toISOString().slice(0, 10)}`
+    : "indefinitely";
+  const reason = user.suspensionReason ? ` Reason: ${user.suspensionReason}` : "";
+  return `This account is suspended ${until}.${reason}`;
+}
 
 export interface SessionUser {
   id: string;
@@ -110,6 +100,8 @@ export class AuthService {
         passwordHash: true,
         loginDisabled: true,
         status: true,
+        suspensionReason: true,
+        suspendedUntil: true,
       },
     });
 
@@ -134,7 +126,12 @@ export class AuthService {
       );
     }
     if (user.status === "SUSPENDED") {
-      throw new DirectoryError("ACCOUNT_SUSPENDED", "This account is suspended.", 403);
+      // A temporary suspension that has run its course lifts itself here,
+      // rather than needing a job to have been alive at the right moment.
+      const lifted = await this.liftExpiredSuspension(user.id);
+      if (!lifted) {
+        throw new DirectoryError("ACCOUNT_SUSPENDED", describeSuspension(user), 403);
+      }
     }
 
     return { id: user.id, username: user.username, displayName: user.displayName };
@@ -161,6 +158,27 @@ export class AuthService {
    * Resolve a cookie to its account, extending the idle window as it goes.
    * Returns null rather than throwing so anonymous browsing stays cheap.
    */
+  /**
+   * Clear a suspension whose end date has passed.
+   *
+   * Duplicated from the directory service rather than injected, because auth
+   * sits below it: pulling the directory in here would make the two circular
+   * for the sake of one updateMany.
+   */
+  private async liftExpiredSuspension(userId: string): Promise<boolean> {
+    const { count } = await this.prisma.user.updateMany({
+      where: { id: userId, status: "SUSPENDED", suspendedUntil: { not: null, lte: new Date() } },
+      data: {
+        status: "ACTIVE",
+        suspensionReason: null,
+        suspendedAt: null,
+        suspendedById: null,
+        suspendedUntil: null,
+      },
+    });
+    return count > 0;
+  }
+
   async resolveSession(token: string | undefined) {
     if (!token) return null;
 
@@ -190,7 +208,13 @@ export class AuthService {
     if (!session || session.revokedAt) return null;
     if (session.expiresAt.getTime() < Date.now()) return null;
     if (session.createdAt.getTime() + SESSION_ABSOLUTE_DAYS * 86400_000 < Date.now()) return null;
-    if (session.user.status === "SUSPENDED" || session.user.loginDisabled) return null;
+    if (session.user.loginDisabled) return null;
+    if (session.user.status === "SUSPENDED") {
+      // Same self-lifting rule as sign-in: a session should come back the
+      // moment a temporary suspension ends, not at the next restart.
+      const lifted = await this.liftExpiredSuspension(session.user.id);
+      if (!lifted) return null;
+    }
 
     // Slide the window, but only once a minute — every request would be a
     // write per page view for no extra safety.

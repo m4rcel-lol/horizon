@@ -128,6 +128,46 @@ export interface InstanceInfo {
   contactEmail?: string;
 }
 
+/**
+ * Handles nobody may take.
+ *
+ * Shared because two paths hand out usernames — registration and renaming —
+ * and a list that lives in only one of them means a name blocked at sign-up is
+ * still reachable by renaming into it.
+ */
+export const RESERVED_USERNAMES: ReadonlySet<string> = new Set([
+  "admin",
+  "administrator",
+  "api",
+  "about",
+  "explore",
+  "home",
+  "login",
+  "logout",
+  "messages",
+  "notifications",
+  "notes",
+  "settings",
+  "setup",
+  "register",
+  "signup",
+  "search",
+  "support",
+  "help",
+  "docs",
+  "privacy",
+  "terms",
+  "root",
+  "system",
+  "horizon",
+  "communities",
+  "bookmarks",
+  "lists",
+  "profile",
+  "status",
+  "communitynotes",
+]);
+
 /** Centralized permission keys */
 export const PERMISSIONS = {
   USERS_VIEW: "users.view",

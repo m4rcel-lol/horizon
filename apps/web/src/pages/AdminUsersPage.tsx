@@ -51,8 +51,24 @@ export function AdminUsersPage() {
     setError(e instanceof ApiError ? e.message : "That did not work.");
 
   const setStatusFor = useMutation({
-    mutationFn: ({ username, next }: { username: string; next: "ACTIVE" | "SUSPENDED" }) =>
-      api.setUserStatus(username, next),
+    mutationFn: ({
+      username,
+      next,
+      reason,
+      durationMinutes,
+    }: {
+      username: string;
+      next: "ACTIVE" | "SUSPENDED";
+      reason?: string;
+      durationMinutes?: number;
+    }) => api.setUserStatus(username, next, { reason, durationMinutes }),
+    onSuccess: refresh,
+    onError,
+  });
+
+  const rename = useMutation({
+    mutationFn: ({ username, next }: { username: string; next: string }) =>
+      api.setUsername(username, next),
     onSuccess: refresh,
     onError,
   });
@@ -125,10 +141,14 @@ export function AdminUsersPage() {
                 isSelf={active?.username === u.username}
                 open={expanded === u.id}
                 onToggle={() => setExpanded(expanded === u.id ? null : u.id)}
-                busy={setStatusFor.isPending || setVerification.isPending}
-                onSuspend={(next) => {
+                busy={setStatusFor.isPending || setVerification.isPending || rename.isPending}
+                onSuspend={(next, reason, durationMinutes) => {
                   setError(null);
-                  setStatusFor.mutate({ username: u.username, next });
+                  setStatusFor.mutate({ username: u.username, next, reason, durationMinutes });
+                }}
+                onRename={(next) => {
+                  setError(null);
+                  rename.mutate({ username: u.username, next });
                 }}
                 onVerify={(type) => {
                   setError(null);
@@ -181,17 +201,23 @@ function UserRow({
   busy,
   onSuspend,
   onVerify,
+  onRename,
 }: {
   user: ApiUser;
   isSelf: boolean;
   open: boolean;
   onToggle: () => void;
   busy: boolean;
-  onSuspend: (next: "ACTIVE" | "SUSPENDED") => void;
+  onSuspend: (next: "ACTIVE" | "SUSPENDED", reason?: string, durationMinutes?: number) => void;
   onVerify: (type: VerificationType) => void;
+  onRename: (next: string) => void;
 }) {
   const { can } = useSession();
   const suspended = user.status === "SUSPENDED";
+  const [suspending, setSuspending] = useState(false);
+  const [reason, setReason] = useState("");
+  const [duration, setDuration] = useState("0");
+  const [handle, setHandle] = useState(user.username);
 
   return (
     <li className="rounded-2xl border" style={{ borderColor: "var(--color-border)" }}>
@@ -265,13 +291,45 @@ function UserRow({
                         : undefined
                   }
                   style={suspended ? undefined : { color: "var(--color-danger, #f91880)" }}
-                  onClick={() => onSuspend(suspended ? "ACTIVE" : "SUSPENDED")}
+                  onClick={() =>
+                    suspended ? onSuspend("ACTIVE") : setSuspending((v) => !v)
+                  }
                 >
                   {suspended ? "Restore" : "Suspend"}
                 </button>
               ) : null}
             </div>
           </div>
+
+          {can(PERMISSIONS.MODERATION_MANAGE) && !user.isSystem ? (
+            <div className="flex flex-col gap-1">
+              <span className="text-[12px] font-bold uppercase tracking-wide" style={{ color: "var(--color-text-secondary)" }}>
+                Username
+              </span>
+              <form
+                className="flex gap-2"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  onRename(handle.trim());
+                }}
+              >
+                <input
+                  className="x-field w-[180px]"
+                  value={handle}
+                  maxLength={20}
+                  aria-label={`Username for @${user.username}`}
+                  onChange={(e) => setHandle(e.target.value)}
+                />
+                <button
+                  type="submit"
+                  className="btn btn-outline"
+                  disabled={busy || handle.trim() === user.username || handle.trim().length < 3}
+                >
+                  Rename
+                </button>
+              </form>
+            </div>
+          ) : null}
 
           {can(PERMISSIONS.VERIFICATION_GRANT) ? (
             <div className="flex flex-col gap-1">
@@ -294,6 +352,62 @@ function UserRow({
             </div>
           ) : null}
         </div>
+      ) : null}
+
+      {open && suspending && !suspended ? (
+        <form
+          className="border-t px-3 py-3 flex flex-wrap gap-2 items-end"
+          style={{ borderColor: "var(--color-border)" }}
+          onSubmit={(e) => {
+            e.preventDefault();
+            onSuspend("SUSPENDED", reason.trim() || undefined, Number(duration) || undefined);
+            setSuspending(false);
+            setReason("");
+          }}
+        >
+          <label className="flex flex-col gap-1 flex-1 min-w-[220px]">
+            <span className="text-[12px] font-bold uppercase tracking-wide" style={{ color: "var(--color-text-secondary)" }}>
+              Reason (shown to them)
+            </span>
+            <input
+              className="x-field"
+              value={reason}
+              maxLength={280}
+              placeholder="Why this account is being suspended"
+              onChange={(e) => setReason(e.target.value)}
+            />
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className="text-[12px] font-bold uppercase tracking-wide" style={{ color: "var(--color-text-secondary)" }}>
+              Duration
+            </span>
+            <select className="x-field w-auto" value={duration} onChange={(e) => setDuration(e.target.value)}>
+              <option value="0">Until lifted</option>
+              <option value="1440">24 hours</option>
+              <option value="10080">7 days</option>
+              <option value="43200">30 days</option>
+            </select>
+          </label>
+          <button type="submit" className="btn btn-primary" disabled={busy}>
+            Confirm suspension
+          </button>
+          <button type="button" className="btn btn-outline" onClick={() => setSuspending(false)}>
+            Cancel
+          </button>
+        </form>
+      ) : null}
+
+      {suspended && user.suspension ? (
+        <p
+          className="border-t px-3 py-2 text-[13px]"
+          style={{ borderColor: "var(--color-border)", color: "var(--color-text-secondary)" }}
+        >
+          Suspended{user.suspension.since ? ` on ${new Date(user.suspension.since).toLocaleDateString()}` : ""}
+          {user.suspension.until
+            ? `, lifting ${new Date(user.suspension.until).toLocaleString()}`
+            : ", until lifted"}
+          {user.suspension.reason ? ` — ${user.suspension.reason}` : ""}
+        </p>
       ) : null}
     </li>
   );

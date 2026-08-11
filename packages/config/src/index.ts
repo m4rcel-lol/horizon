@@ -127,6 +127,12 @@ export const DEFAULT_INSTANCE_SETTINGS = {
   // Setup
   "setup.completed": false,
 
+  // Maintenance. When enabled every request from someone without the
+  // system-management permission is refused, so an administrator can still
+  // sign in and turn it back off.
+  "maintenance.enabled": false,
+  "maintenance.message": "Horizon is down for maintenance. We will be back shortly.",
+
   // -------------------------------------------------------------------------
   // Object storage (S3-compatible) — admin-configurable
   // Env vars override these when set.

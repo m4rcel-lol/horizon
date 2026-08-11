@@ -3,6 +3,7 @@ import { randomBytes } from "node:crypto";
 import * as argon2 from "argon2";
 import {
   COMMUNITY_NOTES_ACCOUNT,
+  RESERVED_USERNAMES,
   type VerificationType,
   avatarShapeFor,
   canAffiliate,
@@ -14,6 +15,15 @@ import { PrismaService } from "../database/prisma.service";
 import { DirectoryError } from "./directory-error";
 
 export type AccountStatus = "ACTIVE" | "SUSPENDED";
+
+/**
+ * How long an account must wait between renaming itself.
+ *
+ * Long enough that a handle is not a disposable costume — someone who builds a
+ * reputation under one name should not be able to shed it hourly — and short
+ * enough that a genuine change of mind is not punished.
+ */
+const USERNAME_COOLDOWN_DAYS = 14;
 
 export interface AffiliationSummary {
   id: string;
@@ -56,6 +66,8 @@ export interface PresentedUser {
   followersCount: number;
   automatedBy: { username: string; displayName: string } | null;
   automatedPending: boolean;
+  /** Set only while suspended, so the admin list can show why and until when. */
+  suspension: { reason: string | null; until: string | null; since: string | null } | null;
   createdAt: string;
 }
 
@@ -88,6 +100,9 @@ const USER_SELECT = {
   affiliatedToId: true,
   affiliatedAt: true,
   status: true,
+  suspensionReason: true,
+  suspendedAt: true,
+  suspendedUntil: true,
   isSystem: true,
   loginDisabled: true,
   createdAt: true,
@@ -111,6 +126,9 @@ type UserRow = {
   affiliatedToId: string | null;
   affiliatedAt: Date | null;
   status: string;
+  suspensionReason: string | null;
+  suspendedAt: Date | null;
+  suspendedUntil: Date | null;
   isSystem: boolean;
   loginDisabled: boolean;
   createdAt: Date;
@@ -257,6 +275,16 @@ export class UserDirectoryService implements OnModuleInit {
       affiliatedAt: user.affiliatedAt?.toISOString() ?? null,
       affiliateCount,
       status: user.status === "SUSPENDED" ? "SUSPENDED" : "ACTIVE",
+      // Only carried while actually suspended: a stale reason left on a
+      // restored account would read as though it were still in force.
+      suspension:
+        user.status === "SUSPENDED"
+          ? {
+              reason: user.suspensionReason,
+              until: user.suspendedUntil?.toISOString() ?? null,
+              since: user.suspendedAt?.toISOString() ?? null,
+            }
+          : null,
       isSystem: user.isSystem,
       loginDisabled: user.loginDisabled,
       isAdmin: await this.userIsAdmin(user.id),
@@ -557,11 +585,203 @@ export class UserDirectoryService implements OnModuleInit {
   }
 
   /** Suspend or restore an account. System accounts refuse. */
-  async setStatus(username: string, status: AccountStatus) {
+  /**
+   * Suspend or restore an account.
+   *
+   * A suspension carries why, by whom, and for how long. Without those a
+   * suspended person is signed out with no explanation and no idea whether it
+   * is permanent, and the instance keeps no record of who did it.
+   *
+   * Suspending revokes every session the account holds. Leaving them merely
+   * unresolvable would keep rows alive that come back to life the moment the
+   * suspension is lifted, on devices the account may no longer control.
+   */
+  async setStatus(
+    username: string,
+    status: AccountStatus,
+    options: { reason?: string | null; until?: Date | null; actorId?: string | null } = {},
+  ) {
     const user = await this.row(username);
     this.refuseIfSystem(user, status === "SUSPENDED" ? "suspended" : "restored");
-    await this.prisma.user.update({ where: { id: user.id }, data: { status } });
+
+    if (status === "SUSPENDED") {
+      await this.prisma.$transaction(async (tx) => {
+        await tx.user.update({
+          where: { id: user.id },
+          data: {
+            status,
+            suspensionReason: options.reason?.trim() || null,
+            suspendedAt: new Date(),
+            suspendedById: options.actorId ?? null,
+            suspendedUntil: options.until ?? null,
+          },
+        });
+        await tx.userSession.updateMany({
+          where: { userId: user.id, revokedAt: null },
+          data: { revokedAt: new Date() },
+        });
+        await tx.moderationAction.create({
+          data: {
+            targetUserId: user.id,
+            actorId: options.actorId ?? user.id,
+            action: "suspend",
+            reason: options.reason?.trim() || null,
+            expiresAt: options.until ?? null,
+            duration: options.until
+              ? Math.max(1, Math.round((options.until.getTime() - Date.now()) / 60000))
+              : null,
+          },
+        });
+      });
+    } else {
+      await this.prisma.$transaction(async (tx) => {
+        await tx.user.update({
+          where: { id: user.id },
+          data: {
+            status,
+            suspensionReason: null,
+            suspendedAt: null,
+            suspendedById: null,
+            suspendedUntil: null,
+          },
+        });
+        await tx.moderationAction.create({
+          data: {
+            targetUserId: user.id,
+            actorId: options.actorId ?? user.id,
+            action: "restore",
+          },
+        });
+      });
+    }
+
     return this.get(username);
+  }
+
+  /**
+   * Change an account's handle.
+   *
+   * The cooldown applies to the account renaming itself, not to an
+   * administrator: a handle being used for impersonation has to be changeable
+   * now, not in two weeks. Every change is recorded, because the handle is the
+   * one piece of identity that moves and an account should not be able to
+   * rename away from its own history.
+   *
+   * The old handle is released rather than redirected. Redirecting would mean
+   * an old link keeps working after someone else claims the name, which points
+   * readers at a stranger — worse than a dead link.
+   */
+  async changeUsername(
+    username: string,
+    next: string,
+    options: { actorId?: string | null; enforceCooldown?: boolean } = {},
+  ): Promise<PresentedUser> {
+    const user = await this.row(username);
+    this.refuseIfSystem(user, "renamed");
+
+    const desired = next.trim();
+    if (!/^[a-zA-Z0-9_]{3,20}$/.test(desired)) {
+      throw new DirectoryError(
+        "USERNAME_INVALID",
+        "A handle is 3 to 20 letters, numbers or underscores.",
+        400,
+      );
+    }
+    if (desired.toLowerCase() === user.username.toLowerCase()) {
+      // Allow a pure change of case — that is a real edit — but not a no-op.
+      if (desired === user.username) {
+        throw new DirectoryError("USERNAME_UNCHANGED", "That is already your handle.", 400);
+      }
+    } else {
+      if (RESERVED_USERNAMES.has(desired.toLowerCase())) {
+        throw new DirectoryError("USERNAME_RESERVED", `@${desired} is reserved on this instance.`, 409);
+      }
+      const taken = await this.prisma.user.findFirst({
+        where: { username: desired },
+        select: { id: true },
+      });
+      if (taken) {
+        throw new DirectoryError("USERNAME_TAKEN", `@${desired} is already taken.`, 409);
+      }
+    }
+
+    if (options.enforceCooldown) {
+      const last = await this.prisma.usernameChange.findFirst({
+        where: { userId: user.id, actorId: user.id },
+        orderBy: { createdAt: "desc" },
+        select: { createdAt: true },
+      });
+      if (last) {
+        const nextAllowed = last.createdAt.getTime() + USERNAME_COOLDOWN_DAYS * 86400_000;
+        if (Date.now() < nextAllowed) {
+          const days = Math.ceil((nextAllowed - Date.now()) / 86400_000);
+          throw new DirectoryError(
+            "USERNAME_COOLDOWN",
+            `You can change your handle again in ${days} day${days === 1 ? "" : "s"}.`,
+            429,
+          );
+        }
+      }
+    }
+
+    const from = user.username;
+    await this.prisma.$transaction(async (tx) => {
+      await tx.user.update({ where: { id: user.id }, data: { username: desired } });
+      await tx.usernameChange.create({
+        data: {
+          userId: user.id,
+          fromUsername: from,
+          toUsername: desired,
+          actorId: options.actorId ?? null,
+        },
+      });
+    });
+
+    return this.get(desired);
+  }
+
+  /** Every handle this account has used, newest first. */
+  async usernameHistory(username: string) {
+    const user = await this.row(username);
+    const rows = await this.prisma.usernameChange.findMany({
+      where: { userId: user.id },
+      orderBy: { createdAt: "desc" },
+      take: 50,
+      select: { id: true, fromUsername: true, toUsername: true, actorId: true, createdAt: true },
+    });
+    return rows.map((r) => ({
+      id: r.id,
+      from: r.fromUsername,
+      to: r.toUsername,
+      /** True when an administrator did it rather than the account itself. */
+      byAdmin: r.actorId !== null && r.actorId !== user.id,
+      createdAt: r.createdAt.toISOString(),
+    }));
+  }
+
+  /**
+   * Lift a suspension whose end date has passed.
+   *
+   * Run on the paths that care — signing in, and resolving a session — rather
+   * than on a timer, so a temporary suspension ends correctly whether or not a
+   * background job happens to be alive. Returns true when it lifted one.
+   */
+  async liftExpiredSuspension(userId: string): Promise<boolean> {
+    const { count } = await this.prisma.user.updateMany({
+      where: {
+        id: userId,
+        status: "SUSPENDED",
+        suspendedUntil: { not: null, lte: new Date() },
+      },
+      data: {
+        status: "ACTIVE",
+        suspensionReason: null,
+        suspendedAt: null,
+        suspendedById: null,
+        suspendedUntil: null,
+      },
+    });
+    return count > 0;
   }
 
 

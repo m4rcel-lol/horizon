@@ -1,5 +1,5 @@
 import { Body, Controller, Delete, Get, HttpException, Param, Patch, Post, Query } from "@nestjs/common";
-import { IsBoolean, IsIn, IsOptional, IsString, Length, Matches } from "class-validator";
+import { IsBoolean, IsIn, IsInt, IsOptional, IsString, Length, Matches, Max, Min } from "class-validator";
 import { PERMISSIONS, VERIFICATION_TYPES, type VerificationType } from "@horizon/shared";
 import { DirectoryError, UserDirectoryService } from "./user-directory.service";
 import { CurrentUser, Public, RequirePermissions } from "../auth/auth.decorators";
@@ -88,6 +88,25 @@ class UpdateUserDto {
 class SetStatusDto {
   @IsIn(["ACTIVE", "SUSPENDED"])
   status!: "ACTIVE" | "SUSPENDED";
+
+  @IsOptional()
+  @IsString()
+  @Length(0, 280)
+  reason?: string;
+
+  /** Minutes from now. Omitted or 0 means the suspension does not expire. */
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(525600)
+  durationMinutes?: number;
+}
+
+class SetUsernameDto {
+  @IsString()
+  @Length(3, 20)
+  @Matches(/^[a-zA-Z0-9_]+$/, { message: "username may only contain letters, numbers and underscores" })
+  username!: string;
 }
 
 /**
@@ -176,8 +195,50 @@ export class UsersController {
   /** Suspend or restore. System accounts refuse. */
   @RequirePermissions(PERMISSIONS.USERS_SUSPEND)
   @Patch(":username/status")
-  async setStatus(@Param("username") username: string, @Body() body: SetStatusDto) {
-    return this.unwrap(async () => ({ user: await this.directory.setStatus(username, body.status) }));
+  async setStatus(
+    @Param("username") username: string,
+    @Body() body: SetStatusDto,
+    @CurrentUser() auth: AuthenticatedUser,
+  ) {
+    return this.unwrap(async () => ({
+      user: await this.directory.setStatus(username, body.status, {
+        reason: body.reason,
+        until: body.durationMinutes
+          ? new Date(Date.now() + body.durationMinutes * 60_000)
+          : null,
+        actorId: auth.id,
+      }),
+    }));
+  }
+
+  /**
+   * Change a handle.
+   *
+   * Your own, subject to the cooldown, or anyone's with the moderation
+   * permission and no cooldown — a handle used for impersonation has to be
+   * changeable now, not in two weeks.
+   */
+  @Patch(":username/username")
+  async setUsername(
+    @Param("username") username: string,
+    @Body() body: SetUsernameDto,
+    @CurrentUser() auth: AuthenticatedUser,
+  ) {
+    const isSelf = auth.username.toLowerCase() === username.toLowerCase();
+    assertSelfOrPermission(auth, username, PERMISSIONS.MODERATION_MANAGE);
+    return this.unwrap(async () => ({
+      user: await this.directory.changeUsername(username, body.username, {
+        actorId: auth.id,
+        enforceCooldown: isSelf,
+      }),
+    }));
+  }
+
+  /** Every handle this account has used. A moderation record. */
+  @RequirePermissions(PERMISSIONS.USERS_VIEW)
+  @Get(":username/username/history")
+  async usernameHistory(@Param("username") username: string) {
+    return this.unwrap(async () => ({ history: await this.directory.usernameHistory(username) }));
   }
 
   /**

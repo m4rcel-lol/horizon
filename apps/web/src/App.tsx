@@ -28,6 +28,7 @@ import { RequirePermission } from "./components/RequirePermission";
 import { AdminLayout } from "./layouts/AdminLayout";
 import { AdminOverviewPage } from "./pages/AdminOverviewPage";
 import { AdminUsersPage } from "./pages/AdminUsersPage";
+import { MaintenanceScreen } from "./components/MaintenanceScreen";
 import { AdminStatisticsPage } from "./pages/AdminStatisticsPage";
 import { AdminNotesPage } from "./pages/AdminNotesPage";
 import { UserStatsPage } from "./pages/UserStatsPage";
@@ -55,6 +56,8 @@ function RootRoute() {
 
 export default function App() {
   return (
+    <>
+      <MaintenanceScreen />
     <Routes>
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
@@ -151,5 +154,6 @@ export default function App() {
         <Route path="/:username/status/:postId" element={<PostPage />} />
       </Route>
     </Routes>
+    </>
   );
 }
