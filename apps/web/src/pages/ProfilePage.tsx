@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeftIcon, MoreIcon } from "../icons";
+import { ArrowLeftIcon } from "../icons";
 import { api, ApiError } from "../api";
 import { Avatar, NameWithBadges, VerifiedBadge } from "../components/Verification";
 import { PostCard } from "../components/PostCard";
@@ -9,6 +9,8 @@ import { EditProfileModal } from "../components/EditProfileModal";
 import { ComposerModal, type ComposerTarget } from "../components/ComposerModal";
 import { FollowButton } from "../components/FollowButton";
 import { FollowsYouChip } from "../components/FollowsYouChip";
+import { ProfileMenu } from "../components/ProfileMenu";
+import { ProfileCommunities } from "../components/CommunityCard";
 import { PageLoader } from "../components/LoadingSpinner";
 import { useSession } from "../hooks/useSession";
 
@@ -96,14 +98,7 @@ export function ProfilePage() {
             )}
           </div>
           <div className="flex items-center gap-2 pt-3">
-            <button
-              type="button"
-              className="icon-btn border"
-              style={{ borderColor: "var(--color-border-strong)" }}
-              aria-label="More"
-            >
-              <MoreIcon className="w-4 h-4" />
-            </button>
+            <ProfileMenu user={user} />
             {isOwnProfile ? (
               <button type="button" className="btn btn-outline" onClick={() => setEditOpen(true)}>
                 Edit profile
@@ -204,6 +199,8 @@ export function ProfilePage() {
                 <strong style={{ color: "var(--color-text)" }}>{followers}</strong> Followers
               </Link>
             </div>
+
+            {user ? <ProfileCommunities username={user.username} /> : null}
           </>
         )}
       </div>

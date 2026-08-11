@@ -128,6 +128,72 @@ make the duration you chose meaningless.
 | `GET /api/posts/scheduled/mine` | signed in |
 | `DELETE /api/posts/scheduled/:id` | signed in, own |
 
+## Reposts on a profile
+
+A repost is something an account *did*, so it appears on their profile —
+placed by when they reposted it, not when it was written, which is the order a
+visitor is reading in. The card carries the original author and a grey
+"@x reposted" line above them.
+
+`repostedBy` is set only on that path. The home timeline shows the post once,
+under its author, with no header.
+
+An account that reposts its own post sees it once: the two would otherwise
+appear as separate rows saying the same thing.
+
+## Communities
+
+Only verified accounts can create one — verified on their own merits or through
+an affiliation. An unverified instance fills up with squatted names within a
+day, and a community carries the weight of a shared space; this is the same
+judgement the affiliation system makes about who can vouch for whom.
+
+The owner is a member from the start (a community with a member count of zero
+that somebody owns is a contradiction) and cannot leave their own. Slugs are
+derived from the name and suffixed when taken.
+
+Communities an account belongs to are pinned to its profile under the follower
+counts, as a card with the icon, name, description and member count.
+
+| Route | Requirement |
+|-------|-------------|
+| `GET /api/communities` | open; `?user=` narrows to one account's |
+| `GET /api/communities/:slug` | open |
+| `POST /api/communities` | signed in **and verified** |
+| `PUT /api/communities/:slug/membership` | signed in |
+
+Posting *into* a community is not built — membership and discovery are.
+
+## Statistics
+
+Two views, both counted from the rows themselves on each request rather than
+from a stored rollup. A rollup is a second source of truth that can drift from
+what it summarises; at this size the aggregates answer in milliseconds. If it
+ever gets slow, that is the moment to cache.
+
+- `GET /api/stats/instance` — needs `users.view`. Accounts, posts, engagement,
+  notes, communities, and posts per day for the last 14 days.
+- `GET /api/stats/user/:username` — **public**, because every figure is already
+  derivable by counting what is on the profile; hiding the totals would be a
+  pretence rather than a privacy measure. Linked from the profile's overflow
+  menu.
+
+## Administration
+
+The admin pages share one frame (`AdminLayout`): a back button, an explicit
+**Exit admin** link back into the app, and a list of the sections the caller
+has permission for. They sit outside the main app shell, so without that there
+was no route back except the browser's history — which does not help if you
+arrived by typing the URL.
+
+Sections: Overview, Statistics, Verification, Community Notes, Instance
+settings. Each is filtered by permission in the nav *and* checked again on
+entry and on the server.
+
+An administrator can write a Community Note from **Admin → Community Notes**.
+The note is attributed to them and rated like anyone else's — it reaches the
+post only once readers agree it helps. The page is a way in, not a way around.
+
 ## Not built
 
 Lists, communities and direct messages are modelled in the schema and have

@@ -287,17 +287,8 @@ export function MainLayout() {
               </li>
             </ul>
 
-            <Link
-              to="/home#composer"
-              className="btn btn-primary mt-4 w-[50px] h-[50px] xl:w-full xl:min-h-[52px] p-0 xl:px-8 text-[17px] self-center xl:self-auto"
-              aria-label="Post"
-            >
-              <span className="hidden xl:inline">Post</span>
-              <ComposeIcon className="w-6 h-6 xl:hidden" />
-            </Link>
-
             {/* Active account chip — opens account switcher dropdown on desktop */}
-            <div className="mt-auto mb-3 flex xl:justify-start justify-center relative" ref={accountRef}>
+            <div className="mt-3 flex xl:justify-start justify-center relative" ref={accountRef}>
               {active ? (
                 <>
                   <button
@@ -320,7 +311,7 @@ export function MainLayout() {
                   {accountOpen ? (
                     <div
                       role="menu"
-                      className="absolute left-0 bottom-full mb-2 w-[280px] rounded-2xl border shadow-xl z-50 overflow-hidden"
+                      className="absolute left-0 top-full mt-2 w-[280px] rounded-2xl border shadow-xl z-50 overflow-hidden"
                       style={{
                         background: "var(--color-bg)",
                         borderColor: "var(--color-border)",
@@ -394,6 +385,15 @@ export function MainLayout() {
                 </Link>
               )}
             </div>
+            <Link
+              to="/home#composer"
+              className="btn btn-primary mt-3 w-[50px] h-[50px] xl:w-full xl:min-h-[52px] p-0 xl:px-8 text-[17px] self-center xl:self-auto"
+              aria-label="Post"
+            >
+              <span className="hidden xl:inline">Post</span>
+              <ComposeIcon className="w-6 h-6 xl:hidden" />
+            </Link>
+
           </nav>
         </div>
 

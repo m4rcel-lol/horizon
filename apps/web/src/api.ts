@@ -58,6 +58,44 @@ export interface ApiPost {
   deletableByViewer: boolean;
   media: ApiMedia[];
   poll: ApiPoll | null;
+  /** Set when the row is on a profile because that account reposted it. */
+  repostedBy: { username: string; displayName: string } | null;
+}
+
+export interface ApiCommunity {
+  id: string;
+  slug: string;
+  name: string;
+  description: string | null;
+  avatarUrl: string | null;
+  memberCount: number;
+  owner: { username: string; displayName: string };
+  joinedByViewer: boolean;
+}
+
+export interface DailyPoint {
+  date: string;
+  posts: number;
+}
+
+export interface InstanceStats {
+  accounts: { total: number; active: number; suspended: number; verified: number; system: number };
+  posts: { total: number; original: number; replies: number; quotes: number; deleted: number };
+  engagement: { likes: number; reposts: number; bookmarks: number; follows: number };
+  notes: { total: number; helpful: number; notHelpful: number; pending: number };
+  communities: { total: number; members: number };
+  recent: { accounts: number; posts: number };
+  daily: DailyPoint[];
+}
+
+export interface UserStats {
+  username: string;
+  posts: { total: number; original: number; replies: number; quotes: number };
+  received: { likes: number; reposts: number; replies: number };
+  given: { likes: number; reposts: number };
+  audience: { followers: number; following: number };
+  joinedAt: string;
+  daily: DailyPoint[];
 }
 
 export interface ApiMedia {
@@ -223,6 +261,32 @@ export const api = {
       method: "PUT",
       body: JSON.stringify({ on }),
     }),
+
+  // Communities
+  communities: () => request<{ communities: ApiCommunity[] }>("/communities"),
+  communitiesFor: (username: string) =>
+    request<{ communities: ApiCommunity[] }>(`/communities?user=${encodeURIComponent(username)}`),
+  community: (slug: string) =>
+    request<{ community: ApiCommunity }>(`/communities/${encodeURIComponent(slug)}`),
+  createCommunity: (body: { name: string; description?: string; avatarUrl?: string }) =>
+    request<{ community: ApiCommunity }>("/communities", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  setMembership: (slug: string, on: boolean) =>
+    request<{ community: ApiCommunity }>(`/communities/${encodeURIComponent(slug)}/membership`, {
+      method: "PUT",
+      body: JSON.stringify({ on }),
+    }),
+
+  // Statistics
+  instanceStats: () => request<{ stats: InstanceStats }>("/stats/instance"),
+  userStats: (username: string) =>
+    request<{ stats: UserStats }>(`/stats/user/${encodeURIComponent(username)}`),
+
+  // Community notes
+  createNote: (body: { postId: string; body: string; classification?: string; sourceUrl?: string }) =>
+    request<{ note: ApiNote }>("/notes", { method: "POST", body: JSON.stringify(body) }),
 
   // Search
   search: (q: string) =>

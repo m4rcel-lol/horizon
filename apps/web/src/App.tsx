@@ -22,6 +22,12 @@ import { RegisterPage } from "./pages/RegisterPage";
 import { AdminSettingsPage } from "./pages/AdminSettingsPage";
 import { AdminVerificationPage } from "./pages/AdminVerificationPage";
 import { RequirePermission } from "./components/RequirePermission";
+import { AdminLayout } from "./layouts/AdminLayout";
+import { AdminOverviewPage } from "./pages/AdminOverviewPage";
+import { AdminStatisticsPage } from "./pages/AdminStatisticsPage";
+import { AdminNotesPage } from "./pages/AdminNotesPage";
+import { UserStatsPage } from "./pages/UserStatsPage";
+import { CommunityPage } from "./pages/CommunitiesPage";
 import { PERMISSIONS } from "@horizon/shared";
 import { PrivacyPage } from "./pages/PrivacyPage";
 import { TermsPage } from "./pages/TermsPage";
@@ -49,22 +55,50 @@ export default function App() {
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
       <Route path="/setup" element={<SetupPage />} />
-      <Route
-        path="/admin/settings"
-        element={
-          <RequirePermission permission={PERMISSIONS.SETTINGS_VIEW}>
-            <AdminSettingsPage />
-          </RequirePermission>
-        }
-      />
-      <Route
-        path="/admin/verification"
-        element={
-          <RequirePermission permission={PERMISSIONS.VERIFICATION_GRANT}>
-            <AdminVerificationPage />
-          </RequirePermission>
-        }
-      />
+      {/* Every admin page shares one frame, so they are navigable between and
+          have a way out. Each still checks its own permission. */}
+      <Route path="/admin" element={<AdminLayout />}>
+        <Route
+          index
+          element={
+            <RequirePermission permission={PERMISSIONS.USERS_VIEW}>
+              <AdminOverviewPage />
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="statistics"
+          element={
+            <RequirePermission permission={PERMISSIONS.USERS_VIEW}>
+              <AdminStatisticsPage />
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="notes"
+          element={
+            <RequirePermission permission={PERMISSIONS.MODERATION_MANAGE}>
+              <AdminNotesPage />
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="settings"
+          element={
+            <RequirePermission permission={PERMISSIONS.SETTINGS_VIEW}>
+              <AdminSettingsPage />
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="verification"
+          element={
+            <RequirePermission permission={PERMISSIONS.VERIFICATION_GRANT}>
+              <AdminVerificationPage />
+            </RequirePermission>
+          }
+        />
+      </Route>
 
       {/* Standalone legal / documentation pages — no main nav chrome */}
       <Route path="/about" element={<AboutPage />} />
@@ -92,7 +126,9 @@ export default function App() {
           <Route path="account" element={<SettingsAccountPage />} />
           <Route path="privacy" element={<SettingsPrivacyPage />} />
         </Route>
+        <Route path="/communities/:slug" element={<CommunityPage />} />
         <Route path="/:username/affiliates" element={<AffiliatesPage />} />
+        <Route path="/:username/stats" element={<UserStatsPage />} />
         <Route path="/:username/followers" element={<FollowListPage mode="followers" />} />
         <Route path="/:username/following" element={<FollowListPage mode="following" />} />
         <Route path="/:username" element={<ProfilePage />} />
