@@ -93,6 +93,26 @@ by the organisation itself or by someone holding `verification.grant`; removing
 an affiliation may also be done by the affiliate leaving. See
 [`authorization.md`](authorization.md).
 
+## From the command line
+
+The admin console at `/admin/verification` is the usual way. For scripting, or
+when nobody has an administrator account yet:
+
+```
+docker compose exec api node apps/api/dist/cli/grant-verification.js <username> <tier> [reason]
+```
+
+Tiers are `NONE`, `STANDARD`, `BUSINESS`, `GOVERNMENT`, `GOVERNMENT_BUSINESS`
+(case-insensitive). Run it with no arguments to print them with what each one
+looks like.
+
+It applies the same rules as the API: system accounts are refused, the change
+is written to `VerificationHistory`, and dropping an organisation tier releases
+that organisation's affiliates rather than leaving them holding a badge nobody
+is backing. Exits non-zero on failure, so it composes in a script.
+
+## Storage
+
 Accounts, tiers and affiliations are stored in Postgres: `User.verification`,
 `User.affiliatedToId`, `User.affiliatedAt`, and every grant and revocation in
 the `VerificationHistory` model.
@@ -103,8 +123,8 @@ Some accounts belong to the instance rather than to a person. They are seeded on
 boot, flagged `isSystem`, and every mutation refuses with
 `SYSTEM_ACCOUNT_IMMUTABLE` (HTTP 403): they cannot be re-verified, edited,
 suspended, affiliated, or used to affiliate anyone else. `loginDisabled` marks
-them unusable for sign-in — the auth module must reject them when it lands,
-since there is no auth module to reject them today.
+them unusable for sign-in, and `resolveSession` rejects any session belonging to
+such an account.
 
 `@CommunityNotes` is one: verified as a business so its notes carry the badge,
 and immutable so no administrator can quietly repurpose or silence it. See

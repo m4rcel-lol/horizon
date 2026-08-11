@@ -177,6 +177,19 @@ export function MainLayout() {
                         Admin Panel
                       </Link>
                     ) : null}
+                    {/* The verification console is the admin page reached most
+                        often, so it gets its own entry rather than sitting two
+                        clicks deep under Settings. */}
+                    {can(PERMISSIONS.VERIFICATION_GRANT) ? (
+                      <Link
+                        role="menuitem"
+                        to="/admin/verification"
+                        className="flex items-center gap-3 px-4 py-3 hover:bg-[var(--color-bg-secondary)] text-[15px] font-bold"
+                        onClick={() => setMoreOpen(false)}
+                      >
+                        Verification
+                      </Link>
+                    ) : null}
                     <Link
                       role="menuitem"
                       to="/settings/appearance"

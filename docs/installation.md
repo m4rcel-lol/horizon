@@ -153,6 +153,12 @@ appear under Settings for accounts that hold them, and every route behind them i
 checked server-side — see [`authorization.md`](authorization.md) for the full map
 of what each route requires.
 
+To grant a verification tier without opening a browser:
+
+```
+docker compose exec api node apps/api/dist/cli/grant-verification.js <username> <tier>
+```
+
 ## Rebuilding
 
 ```bash

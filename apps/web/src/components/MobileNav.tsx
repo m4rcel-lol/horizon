@@ -267,6 +267,15 @@ export function MobileDrawer({ open, onClose }: { open: boolean; onClose: () => 
               Admin Panel
             </Link>
           ) : null}
+          {can(PERMISSIONS.VERIFICATION_GRANT) ? (
+            <Link
+              to="/admin/verification"
+              className="flex items-center gap-5 px-4 text-[17px] font-bold"
+              style={{ minHeight: 52 }}
+            >
+              Verification
+            </Link>
+          ) : null}
 
           {accounts.length > 0 ? (
             <div className="mt-2 pt-2 border-t" style={{ borderColor: "var(--color-border)" }}>
