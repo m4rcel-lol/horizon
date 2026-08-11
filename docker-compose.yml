@@ -19,7 +19,7 @@ services:
       - caddy_data:/data
       - caddy_config:/config
     environment:
-      - CADDY_DOMAIN=${CADDY_DOMAIN:-tweeting.shop}
+      - CADDY_DOMAIN=${CADDY_DOMAIN:-horizon.european-commission-europa.eu}
       - ACME_EMAIL=${ACME_EMAIL:-}
     depends_on:
       - api

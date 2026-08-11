@@ -1,7 +1,7 @@
 # Demo screenshots
 
 Screenshots of Horizon running for real: Postgres, Redis, the API, the built SPA
-and Caddy, served over HTTPS at `tweeting.shop`. Every image is a live capture at
+and Caddy, served over HTTPS at `horizon.european-commission-europa.eu`. Every image is a live capture at
 2× on a 1280×900 desktop viewport unless the filename says `-mobile` (390×844),
 and `-dark` files are the same page with the viewer's theme set to dark.
 
@@ -39,7 +39,7 @@ predates the X restyle and still has the broken logo that was fixed later.
 
 | Folder | What it shows |
 |--------|---------------|
-| [`history/01-first-deployment/`](history/01-first-deployment) | The first deployment at `tweeting.shop`, before the restyle. The logo is a clipped sliver in every shot — the missing-`viewBox` bug these captures surfaced |
+| [`history/01-first-deployment/`](history/01-first-deployment) | The first deployment at `horizon.european-commission-europa.eu`, before the restyle. The logo is a clipped sliver in every shot — the missing-`viewBox` bug these captures surfaced |
 | [`history/02-x-restyle/`](history/02-x-restyle) | The interface after the X restyle, before verification existed |
 | [`history/03-verification-rollout/`](history/03-verification-rollout) | Verification tiers and affiliation, including the admin console mid-action |
 | [`history/04-community-notes-rollout/`](history/04-community-notes-rollout) | Community Notes and the affiliates view when they first landed |

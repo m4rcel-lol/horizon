@@ -15,7 +15,7 @@ single host port, `HTTP_PORT` (**25343** by default), bound to `127.0.0.1`. A
 TLS reverse proxy in front of it serves the public domain:
 
 ```
-https://tweeting.shop → proxy (host Caddy or `--profile edge`) → 127.0.0.1:25343 → web container
+https://horizon.european-commission-europa.eu → proxy (host Caddy or `--profile edge`) → 127.0.0.1:25343 → web container
                                                                                     ├── /api/*, /ws*  → api:3000
                                                                                     ├── /media/*      → minio:9000
                                                                                     └── everything else → SPA
@@ -34,7 +34,7 @@ cp .env.example .env
 
 Edit `.env`:
 
-- Set `INSTANCE_URL` to your public URL (`https://tweeting.shop`)
+- Set `INSTANCE_URL` to your public URL (`https://horizon.european-commission-europa.eu`)
 - Generate strong secrets:
   ```bash
   openssl rand -hex 32   # SESSION_SECRET
@@ -63,7 +63,7 @@ sudo caddy validate --config /etc/caddy/Caddyfile
 sudo systemctl reload caddy
 ```
 
-`infra/Caddyfile.host` serves `tweeting.shop`, redirects `www.tweeting.shop` to
+`infra/Caddyfile.host` serves `horizon.european-commission-europa.eu`, redirects `www.horizon.european-commission-europa.eu` to
 it, and proxies to `127.0.0.1:25343`. Caddy requests Let's Encrypt certificates
 automatically once DNS points at the host. To use a different domain, edit the
 site addresses in that file and update `INSTANCE_URL` in `.env`.
@@ -87,7 +87,7 @@ host Caddy — they would both try to bind 80/443.
 
 On first boot the API will run migrations automatically (or use the worker/entrypoint).
 
-Open the instance URL (`https://tweeting.shop`) and visit `/setup` to complete
+Open the instance URL (`https://horizon.european-commission-europa.eu`) and visit `/setup` to complete
 first-run configuration:
 
 - Instance name & description
@@ -121,9 +121,9 @@ pnpm --filter @horizon/web dev
 
 ## Production Notes
 
-- Point DNS A/AAAA records for `tweeting.shop` (and `www`) to the host
+- Point DNS A/AAAA records for `horizon.european-commission-europa.eu` (and `www`) to the host
 - Caddy obtains Let's Encrypt certificates automatically when the domain is publicly reachable
-- Uploaded media is served from `https://tweeting.shop/media` (proxied to MinIO), so `STORAGE_PUBLIC_URL` must match your public domain
+- Uploaded media is served from `https://horizon.european-commission-europa.eu/media` (proxied to MinIO), so `STORAGE_PUBLIC_URL` must match your public domain
 - Use external managed Postgres/Redis/S3 if preferred by overriding the compose services and environment variables; with external storage, set `STORAGE_PUBLIC_URL` to that provider's URL and the `/media` route goes unused
 - Never expose Postgres, Redis, or MinIO ports publicly — keep `MINIO_BIND_ADDR=127.0.0.1`
 - Keep `HTTP_BIND_ADDR=127.0.0.1` unless the proxy runs on a different machine; if it does, firewall `HTTP_PORT` to the proxy's address

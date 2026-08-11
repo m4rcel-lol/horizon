@@ -1,6 +1,6 @@
 # Caddyfile for a Caddy binary running on the host (no Docker).
 #
-# This is the default deployment path for tweeting.shop: docker compose
+# This is the default deployment path for horizon.european-commission-europa.eu: docker compose
 # publishes the app on 127.0.0.1:25343 and this config terminates TLS and
 # proxies to it.
 #
@@ -10,21 +10,21 @@
 #   sudo systemctl reload caddy
 #
 # Requirements:
-#   - DNS A/AAAA records for tweeting.shop (and www) pointing at this host
+#   - DNS A/AAAA records for horizon.european-commission-europa.eu (and www) pointing at this host
 #   - Ports 80 and 443 free (do NOT also run the optional `caddy` compose
 #     service, it binds the same ports)
 
 # Optional: uncomment and set a real address to receive Let's Encrypt expiry
 # notices. An `email` directive with an empty value stops Caddy from starting.
 # {
-# 	email admin@tweeting.shop
+# 	email admin@horizon.european-commission-europa.eu
 # }
 
-www.tweeting.shop {
-	redir https://tweeting.shop{uri} permanent
+www.horizon.european-commission-europa.eu {
+	redir https://horizon.european-commission-europa.eu{uri} permanent
 }
 
-tweeting.shop {
+horizon.european-commission-europa.eu {
 	encode gzip zstd
 
 	reverse_proxy 127.0.0.1:25343 {
@@ -41,7 +41,7 @@ tweeting.shop {
 	}
 
 	log {
-		output file /var/log/caddy/tweeting.shop.log
+		output file /var/log/caddy/horizon.european-commission-europa.eu.log
 		format console
 	}
 }
