@@ -120,7 +120,15 @@ export class NotificationsService {
     }
   }
 
-  /** @mentions in a post body, resolved to accounts that exist. */
+  /**
+   * @mentions in a post body, resolved to accounts that exist.
+   *
+   * Anyone who has blocked the author is dropped: reaching someone's
+   * notifications by typing their handle is exactly the interaction a block is
+   * meant to stop, and it is the one route into their attention that does not
+   * go through their own posts. Queried directly rather than through
+   * SocialService, which depends on this service.
+   */
   async recordMentions(body: string, actorId: string, postId: string) {
     const handles = [...new Set([...body.matchAll(/@([a-zA-Z0-9_]{3,20})/g)].map((m) => m[1]))];
     if (handles.length === 0) return;
@@ -128,8 +136,16 @@ export class NotificationsService {
       where: { username: { in: handles }, status: { not: "DELETED" } },
       select: { id: true },
     });
+    if (users.length === 0) return;
+    const blockedBy = await this.prisma.block.findMany({
+      where: { blockedId: actorId, blockerId: { in: users.map((u) => u.id) } },
+      select: { blockerId: true },
+    });
+    const blockers = new Set(blockedBy.map((b) => b.blockerId));
     await Promise.all(
-      users.map((u) => this.record({ recipientId: u.id, actorId, type: "MENTION", postId })),
+      users
+        .filter((u) => !blockers.has(u.id))
+        .map((u) => this.record({ recipientId: u.id, actorId, type: "MENTION", postId })),
     );
   }
 

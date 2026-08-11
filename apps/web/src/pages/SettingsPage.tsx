@@ -317,6 +317,8 @@ export function SettingsPrivacyPage() {
 
       <FollowRequests />
 
+      <BlockedAccounts />
+
 
       <section>
         <h3 className="text-[17px] font-bold mb-2">Who can message me</h3>
@@ -520,6 +522,75 @@ function FollowRequests() {
                 Accept
               </button>
             </div>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+/**
+ * Accounts this user has blocked.
+ *
+ * Blocking happens from a profile, but undoing it there means finding the
+ * profile again — so the list of them lives with the other privacy controls.
+ * Hidden entirely when empty, like the follow requests above it.
+ */
+function BlockedAccounts() {
+  const queryClient = useQueryClient();
+  const { data, isLoading } = useQuery({
+    queryKey: ["blocks"],
+    queryFn: api.blocks,
+    retry: false,
+  });
+
+  const unblock = useMutation({
+    mutationFn: (username: string) => api.setBlock(username, false),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["blocks"] });
+      queryClient.invalidateQueries({ queryKey: ["relationship"] });
+    },
+  });
+
+  const users = data?.users ?? [];
+  if (isLoading || users.length === 0) return null;
+
+  return (
+    <section className="mb-8">
+      <h3 className="text-[17px] font-bold mb-2">
+        Blocked accounts <span style={{ color: "var(--color-text-secondary)" }}>({users.length})</span>
+      </h3>
+      <p className="text-[14px] mb-3" style={{ color: "var(--color-text-secondary)" }}>
+        They cannot follow you or interact with your posts. They can still read them.
+      </p>
+      <ul className="flex flex-col gap-2">
+        {users.map((u) => (
+          <li
+            key={u.id}
+            className="flex items-center gap-3 rounded-2xl border p-3"
+            style={{ borderColor: "var(--color-border)" }}
+          >
+            <Avatar shape={u.avatarShape} size={40} src={u.avatarUrl || "/assets/default-avatar.svg"} />
+            <div className="min-w-0 flex-1">
+              <Link to={`/${u.username}`} className="font-bold hover:underline block truncate">
+                <NameWithBadges
+                  displayName={u.displayName}
+                  verification={u.effectiveVerification}
+                  badgeClassName="w-[15px] h-[15px]"
+                />
+              </Link>
+              <span className="text-[14px] truncate" style={{ color: "var(--color-text-secondary)" }}>
+                @{u.username}
+              </span>
+            </div>
+            <button
+              type="button"
+              className="btn btn-outline shrink-0"
+              disabled={unblock.isPending}
+              onClick={() => unblock.mutate(u.username)}
+            >
+              Unblock
+            </button>
           </li>
         ))}
       </ul>

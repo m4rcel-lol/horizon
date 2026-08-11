@@ -6,6 +6,12 @@ import { useSession } from "../hooks/useSession";
 
 const cards = [
   {
+    to: "/admin/users",
+    title: "Users",
+    body: "Search every account, suspend or restore one, and change its verification.",
+    permission: PERMISSIONS.USERS_VIEW,
+  },
+  {
     to: "/admin/statistics",
     title: "Statistics",
     body: "Accounts, posts, engagement and Community Notes across the whole instance.",

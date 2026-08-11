@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, HttpException, Param, Patch, Post } from "@nestjs/common";
+import { Body, Controller, Delete, Get, HttpException, Param, Patch, Post, Query } from "@nestjs/common";
 import { IsBoolean, IsIn, IsOptional, IsString, Length, Matches } from "class-validator";
 import { PERMISSIONS, VERIFICATION_TYPES, type VerificationType } from "@horizon/shared";
 import { DirectoryError, UserDirectoryService } from "./user-directory.service";
@@ -116,6 +116,34 @@ export class UsersController {
   @Get()
   async list() {
     return { users: await this.directory.list() };
+  }
+
+  /**
+   * The directory as an administrator needs it: searched, filtered and paged.
+   *
+   * Declared before `:username` so "search" is matched as a literal segment
+   * rather than read as a handle.
+   */
+  @RequirePermissions(PERMISSIONS.USERS_VIEW)
+  @Get("search")
+  async search(
+    @Query("q") q?: string,
+    @Query("status") status?: string,
+    @Query("verified") verified?: string,
+    @Query("page") page?: string,
+    @Query("perPage") perPage?: string,
+  ) {
+    return this.unwrap(() =>
+      this.directory.search({
+        query: q,
+        // Deleted accounts stay out of the directory entirely, here as
+        // everywhere else, so they are not an option to filter for.
+        status: status === "ACTIVE" || status === "SUSPENDED" ? status : "ALL",
+        verified: verified === "true" ? true : verified === "false" ? false : undefined,
+        page: page ? Number(page) : undefined,
+        perPage: perPage ? Number(perPage) : undefined,
+      }),
+    );
   }
 
   /**

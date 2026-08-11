@@ -65,6 +65,8 @@ export interface ApiPost {
   poll: ApiPoll | null;
   /** Set when the row is on a profile because that account reposted it. */
   repostedBy: { username: string; displayName: string } | null;
+  /** The author blocked the caller: every action here would be refused. */
+  blockedByAuthor: boolean;
   /** The community it was posted into, shown as "from <community>" beneath it. */
   community: { slug: string; name: string; avatarUrl: string | null } | null;
 }
@@ -191,6 +193,10 @@ export interface Relationship {
   requested: boolean;
   /** Whether their profile timeline is readable by the caller. */
   canViewPosts: boolean;
+  /** The caller has blocked them. */
+  blocking: boolean;
+  /** They have blocked the caller, so interaction controls are disabled. */
+  blockedBy: boolean;
 }
 
 export interface ApiUser {
@@ -313,6 +319,11 @@ export const api = {
       method: "PATCH",
       body: JSON.stringify(body),
     }),
+  setUserStatus: (username: string, status: "ACTIVE" | "SUSPENDED") =>
+    request<{ user: ApiUser }>(`/users/${encodeURIComponent(username)}/status`, {
+      method: "PATCH",
+      body: JSON.stringify({ status }),
+    }),
   setVerification: (username: string, type: VerificationType, reason?: string) =>
     request<{ user: ApiUser; releasedAffiliates: number }>(
       `/users/${encodeURIComponent(username)}/verification`,
@@ -332,6 +343,27 @@ export const api = {
       { method: "PUT", body: JSON.stringify({ on }) },
     ),
   followRequests: () => request<{ users: ApiUser[] }>("/users/follow-requests/mine"),
+  blocks: () => request<{ users: ApiUser[] }>("/users/blocks/mine"),
+  setBlock: (username: string, on: boolean) =>
+    request<{ user: ApiUser; blocked: boolean }>(`/users/${encodeURIComponent(username)}/block`, {
+      method: "PUT",
+      body: JSON.stringify({ on }),
+    }),
+  adminSearchUsers: (params: {
+    q?: string;
+    status?: "ALL" | "ACTIVE" | "SUSPENDED";
+    verified?: boolean;
+    page?: number;
+  }) => {
+    const qs = new URLSearchParams();
+    if (params.q) qs.set("q", params.q);
+    if (params.status && params.status !== "ALL") qs.set("status", params.status);
+    if (params.verified !== undefined) qs.set("verified", String(params.verified));
+    if (params.page) qs.set("page", String(params.page));
+    return request<{ users: ApiUser[]; total: number; page: number; perPage: number }>(
+      `/users/search?${qs.toString()}`,
+    );
+  },
   resolveFollowRequest: (username: string, approve: boolean) =>
     request<{ ok: true; approved: boolean }>(
       `/users/follow-requests/${encodeURIComponent(username)}`,
