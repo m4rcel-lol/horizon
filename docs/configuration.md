@@ -35,6 +35,28 @@ domain from `infra/Caddyfile.host`. See [Installation](installation.md#reverse-p
 
 When both env and admin settings define storage or email, **environment wins**.
 
+## Profile media
+
+Avatars and banners are stored on the API's own filesystem, under `MEDIA_ROOT`
+(default `<cwd>/data/media`; docker-compose sets `/app/data/media` and mounts the
+`media_data` volume there, so uploads survive a rebuild).
+
+This needs no configuration at all, which is the point — object storage requires
+credentials an operator has to supply before anything can be uploaded, and a
+fresh instance should be able to set a profile picture on day one. Files are
+served back through `GET /api/media/:name`, so they travel over the site's own
+origin and no extra host, bucket or proxy route is involved.
+
+- Accepted: JPEG, PNG, WebP and GIF, animation preserved
+- Limits: 5 MB for an avatar, 10 MB for a banner
+- The declared content type is checked against the file's magic bytes, so a
+  renamed file cannot be stored and served as an image
+- Names are UUIDs and content never changes under a name, so responses are
+  cached immutably
+
+The S3 path in `@horizon/storage` remains the eventual home for instances that
+outgrow local disk; the settings below configure it.
+
 ## Admin panel: Storage & Email
 
 After first-run setup:

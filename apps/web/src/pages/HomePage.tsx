@@ -5,6 +5,8 @@ import { api, ApiError } from "../api";
 import { useSession } from "../hooks/useSession";
 import { Link } from "react-router-dom";
 import { PostCard } from "../components/PostCard";
+import { ComposerModal, type ComposerTarget } from "../components/ComposerModal";
+import type { ApiPost } from "../api";
 
 const tabs = [
   { id: "for-you", label: "For you" },
@@ -26,6 +28,9 @@ export function HomePage() {
     if (window.location.hash === "#composer") composerRef.current?.focus();
   }, []);
   const [postError, setPostError] = useState<string | null>(null);
+  const [composing, setComposing] = useState<ComposerTarget>(null);
+  const openReply = (post: ApiPost) => setComposing({ mode: "reply", post });
+  const openQuote = (post: ApiPost) => setComposing({ mode: "quote", post });
 
   const publish = useMutation({
     mutationFn: (content: string) => api.createPost(content),
@@ -117,7 +122,7 @@ export function HomePage() {
         <ul>
           {posts.map((post) => (
             <li key={post.id}>
-              <PostCard post={post} />
+              <PostCard post={post} onReply={openReply} onQuote={openQuote} />
             </li>
           ))}
         </ul>
@@ -131,6 +136,8 @@ export function HomePage() {
           </p>
         </div>
       )}
+
+      <ComposerModal target={composing} onClose={() => setComposing(null)} />
     </div>
   );
 }

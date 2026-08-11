@@ -9,6 +9,7 @@ import { PostsModule } from "./posts/posts.module";
 import { InstanceModule } from "./instance/instance.module";
 import { SetupModule } from "./setup/setup.module";
 import { CommunityNotesModule } from "./notes/community-notes.module";
+import { MediaModule } from "./media/media.module";
 import { SessionGuard } from "./auth/session.guard";
 import { PermissionsGuard } from "./auth/permissions.guard";
 
@@ -29,6 +30,7 @@ import { PermissionsGuard } from "./auth/permissions.guard";
     InstanceModule,
     SetupModule,
     CommunityNotesModule,
+    MediaModule,
   ],
   // Guards run in the order they are declared. Rate limiting comes first so a
   // flood is cheap to reject; SessionGuard then resolves the caller and closes

@@ -6,6 +6,7 @@ import { api, ApiError } from "../api";
 import { Avatar, NameWithBadges, VerifiedBadge } from "../components/Verification";
 import { PostCard } from "../components/PostCard";
 import { EditProfileModal } from "../components/EditProfileModal";
+import { ComposerModal, type ComposerTarget } from "../components/ComposerModal";
 import { PageLoader } from "../components/LoadingSpinner";
 import { useSession } from "../hooks/useSession";
 
@@ -16,6 +17,7 @@ export function ProfilePage() {
   const { active } = useSession();
   const handle = username ?? active?.username ?? "";
   const [editOpen, setEditOpen] = useState(false);
+  const [composing, setComposing] = useState<ComposerTarget>(null);
   const [localAvatar, setLocalAvatar] = useState<string | null>(null);
   const [localBanner, setLocalBanner] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -214,7 +216,11 @@ export function ProfilePage() {
         <ul className="animate-fade-in">
           {posts.map((post) => (
             <li key={post.id}>
-              <PostCard post={post} />
+              <PostCard
+                post={post}
+                onReply={(p) => setComposing({ mode: "reply", post: p })}
+                onQuote={(p) => setComposing({ mode: "quote", post: p })}
+              />
             </li>
           ))}
         </ul>
@@ -239,19 +245,30 @@ export function ProfilePage() {
           setSaveError(null);
           setSaving(true);
           try {
-            if (avatarFile) {
-              if (localAvatar) URL.revokeObjectURL(localAvatar);
-              setLocalAvatar(URL.createObjectURL(avatarFile));
-            }
-            if (bannerFile) {
-              if (localBanner) URL.revokeObjectURL(localBanner);
-              setLocalBanner(URL.createObjectURL(bannerFile));
-            }
+            // Upload first: if storing the file fails there is no point
+            // writing a URL that would 404, and the old picture is still good.
+            const [avatarUrl, bannerUrl] = await Promise.all([
+              avatarFile ? api.uploadMedia(avatarFile, "avatar").then((r) => r.url) : undefined,
+              bannerFile ? api.uploadMedia(bannerFile, "banner").then((r) => r.url) : undefined,
+            ]);
 
             await api.updateUser(active.username, {
               displayName: displayName || undefined,
               bio: bio ?? "",
+              ...(avatarUrl ? { avatarUrl } : {}),
+              ...(bannerUrl ? { bannerUrl } : {}),
             });
+
+            // The stored URL is the truth now; drop the local preview so the
+            // page stops showing a blob that dies with the tab.
+            if (avatarUrl && localAvatar) {
+              URL.revokeObjectURL(localAvatar);
+              setLocalAvatar(null);
+            }
+            if (bannerUrl && localBanner) {
+              URL.revokeObjectURL(localBanner);
+              setLocalBanner(null);
+            }
             await queryClient.invalidateQueries({ queryKey: ["user", handle] });
             await queryClient.invalidateQueries({ queryKey: ["session"] });
             await refetch();
@@ -270,6 +287,8 @@ export function ProfilePage() {
           {saveError}
         </p>
       ) : null}
+
+      <ComposerModal target={composing} onClose={() => setComposing(null)} />
     </div>
   );
 }

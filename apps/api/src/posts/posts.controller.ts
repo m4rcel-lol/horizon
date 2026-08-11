@@ -1,5 +1,5 @@
-import { Body, Controller, Get, HttpException, Param, Post, Query } from "@nestjs/common";
-import { IsString, Length } from "class-validator";
+import { Body, Controller, Get, HttpException, Param, Post, Put, Query } from "@nestjs/common";
+import { IsBoolean, IsOptional, IsString, Length } from "class-validator";
 import { PostsService } from "./posts.service";
 import { DirectoryError } from "../users/user-directory.service";
 import { CurrentUser, Public } from "../auth/auth.decorators";
@@ -9,13 +9,30 @@ class CreatePostDto {
   @IsString()
   @Length(1, 500)
   content!: string;
+
+  /** Makes this a reply to that post. */
+  @IsOptional()
+  @IsString()
+  @Length(1, 64)
+  replyToId?: string;
+
+  /** Makes this a quote of that post: your words above, theirs embedded below. */
+  @IsOptional()
+  @IsString()
+  @Length(1, 64)
+  quoteOfId?: string;
+}
+
+class SetFlagDto {
+  @IsBoolean()
+  on!: boolean;
 }
 
 /**
  * Posts.
  *
- * Reading is open; posting needs a session, and the author is taken from that
- * session. It used to come from the request body, which meant anyone could
+ * Reading is open; writing and reacting need a session, and the actor is taken
+ * from it. It used to come from the request body, which meant anyone could
  * post as anyone.
  */
 @Controller("posts")
@@ -36,20 +53,54 @@ export class PostsController {
   /** The timeline, newest first. `author` narrows it to one account. */
   @Public()
   @Get()
-  async list(@Query("author") author?: string) {
-    return { posts: await this.posts.list(author) };
+  async list(@CurrentUser() auth: AuthenticatedUser | null, @Query("author") author?: string) {
+    return { posts: await this.posts.list(author, auth?.id ?? null) };
   }
 
   @Post()
   async create(@Body() body: CreatePostDto, @CurrentUser() auth: AuthenticatedUser) {
     return this.unwrap(async () => ({
-      post: await this.posts.create({ author: auth.username, content: body.content }),
+      post: await this.posts.create({
+        author: auth.username,
+        content: body.content,
+        replyToId: body.replyToId,
+        quoteOfId: body.quoteOfId,
+        viewerId: auth.id,
+      }),
     }));
   }
 
   @Public()
   @Get(":id")
-  async get(@Param("id") id: string) {
-    return this.unwrap(async () => ({ post: await this.posts.get(id) }));
+  async get(@Param("id") id: string, @CurrentUser() auth: AuthenticatedUser | null) {
+    return this.unwrap(async () => ({ post: await this.posts.get(id, auth?.id ?? null) }));
+  }
+
+  @Public()
+  @Get(":id/replies")
+  async replies(@Param("id") id: string, @CurrentUser() auth: AuthenticatedUser | null) {
+    return this.unwrap(async () => ({ posts: await this.posts.replies(id, auth?.id ?? null) }));
+  }
+
+  /**
+   * PUT rather than POST: sending the state you want is idempotent, so a
+   * double tap or a retried request cannot leave the count drifting.
+   */
+  @Put(":id/like")
+  async like(
+    @Param("id") id: string,
+    @Body() body: SetFlagDto,
+    @CurrentUser() auth: AuthenticatedUser,
+  ) {
+    return this.unwrap(async () => ({ post: await this.posts.setLike(id, auth.id, body.on) }));
+  }
+
+  @Put(":id/repost")
+  async repost(
+    @Param("id") id: string,
+    @Body() body: SetFlagDto,
+    @CurrentUser() auth: AuthenticatedUser,
+  ) {
+    return this.unwrap(async () => ({ post: await this.posts.setRepost(id, auth.id, body.on) }));
   }
 }

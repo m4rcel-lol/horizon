@@ -41,6 +41,16 @@ export interface ApiPost {
   author: ApiUser | null;
   /** Only notes readers rated helpful. */
   notes: ApiNote[];
+  likeCount: number;
+  replyCount: number;
+  repostCount: number;
+  quoteCount: number;
+  /** The caller's own state, so the buttons render filled or not. */
+  likedByViewer: boolean;
+  repostedByViewer: boolean;
+  /** The post this one quotes, embedded one level deep. */
+  quoteOf: ApiPost | null;
+  replyTo: { id: string; authorUsername: string } | null;
 }
 
 export interface ApiUser {
@@ -145,8 +155,44 @@ export const api = {
     request<{ posts: ApiPost[] }>(`/posts${author ? `?author=${encodeURIComponent(author)}` : ""}`),
   getPost: (id: string) => request<{ post: ApiPost }>(`/posts/${encodeURIComponent(id)}`),
   // The author is the signed-in account, taken from the session server-side.
-  createPost: (content: string) =>
-    request<{ post: ApiPost }>("/posts", { method: "POST", body: JSON.stringify({ content }) }),
+  createPost: (content: string, options?: { replyToId?: string; quoteOfId?: string }) =>
+    request<{ post: ApiPost }>("/posts", {
+      method: "POST",
+      body: JSON.stringify({ content, ...options }),
+    }),
+  replies: (id: string) => request<{ posts: ApiPost[] }>(`/posts/${encodeURIComponent(id)}/replies`),
+  // PUT the state you want: a double tap cannot leave the count drifting.
+  setLike: (id: string, on: boolean) =>
+    request<{ post: ApiPost }>(`/posts/${encodeURIComponent(id)}/like`, {
+      method: "PUT",
+      body: JSON.stringify({ on }),
+    }),
+  setRepost: (id: string, on: boolean) =>
+    request<{ post: ApiPost }>(`/posts/${encodeURIComponent(id)}/repost`, {
+      method: "PUT",
+      body: JSON.stringify({ on }),
+    }),
+
+  /** Uploads an avatar or banner and returns the URL to store on the account. */
+  uploadMedia: async (file: File, kind: "avatar" | "banner") => {
+    const form = new FormData();
+    form.append("file", file);
+    // No Content-Type header: the browser must set the multipart boundary.
+    const res = await fetch(`/api/media/upload?kind=${kind}`, {
+      method: "POST",
+      credentials: "include",
+      body: form,
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || data?.error) {
+      throw new ApiError(
+        data?.error?.code ?? "UPLOAD_FAILED",
+        data?.error?.message ?? `Upload failed (${res.status})`,
+        res.status,
+      );
+    }
+    return data as { url: string };
+  },
 
   listNotes: (postId?: string) =>
     request<{ notes: ApiNote[] }>(`/notes${postId ? `?postId=${encodeURIComponent(postId)}` : ""}`),
