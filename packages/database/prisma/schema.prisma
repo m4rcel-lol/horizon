@@ -4,6 +4,9 @@
 generator client {
   provider        = "prisma-client-js"
   previewFeatures = ["postgresqlExtensions"]
+  // The Alpine images run musl with OpenSSL 3; without this Prisma guesses
+  // openssl-1.1.x and may not find an engine it can load.
+  binaryTargets   = ["native", "linux-musl-openssl-3.0.x"]
 }
 
 datasource db {

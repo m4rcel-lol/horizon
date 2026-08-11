@@ -134,6 +134,42 @@ The schema needs the `citext` extension for case-insensitive usernames and
 emails; the initial migration creates it, so the database user must be allowed
 to `CREATE EXTENSION` (the default superuser in the bundled Postgres is).
 
+## Creating an administrator
+
+There is no first-run wizard yet, so the first administrator is created from the
+command line:
+
+```bash
+docker compose exec api node apps/api/dist/cli/create-admin.js \
+  <username> <email> <password>
+```
+
+It is idempotent: running it again resets that account's password and re-grants
+the role, which is also how you recover from being locked out. It creates the
+`administrator` role with every permission key and assigns it.
+
+**Authorization is not enforced yet.** The `/admin` pages are currently reachable
+by anyone who knows the URL, so this role is recorded for when checks land rather
+than being a security boundary today. Do not treat an unauthenticated instance as
+private.
+
+## Rebuilding
+
+```bash
+docker compose down
+docker compose build --no-cache      # or drop --no-cache for a faster rebuild
+docker compose up -d
+docker compose logs -f api           # watch it apply migrations and start
+```
+
+Migrations run automatically when the API container starts. To wipe the database
+and start over — this deletes every account and post:
+
+```bash
+docker compose down -v               # -v also removes the Postgres volume
+docker compose up -d --build
+```
+
 ## Production Notes
 
 - Point DNS A/AAAA records for `horizon.european-commission-europa.eu` (and `www`) to the host
