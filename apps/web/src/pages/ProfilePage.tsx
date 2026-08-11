@@ -301,9 +301,16 @@ export function ProfilePage() {
               bannerFile ? api.uploadMedia(bannerFile, "banner").then((r) => r.url) : undefined,
             ]);
 
+            // Sent even when blank: an empty string is how you clear one of
+            // these, so `|| undefined` would make them impossible to remove
+            // once set.
             await api.updateUser(active.username, {
               displayName: displayName || undefined,
               bio: bio ?? "",
+              website: website ?? "",
+              location: location ?? "",
+              pronouns: pronouns ?? "",
+              birthday: birthday ?? "",
               ...(avatarUrl ? { avatarUrl } : {}),
               ...(bannerUrl ? { bannerUrl } : {}),
             });

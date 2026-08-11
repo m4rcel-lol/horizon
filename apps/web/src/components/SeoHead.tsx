@@ -41,8 +41,7 @@ export function SeoHead({
 
     const nodes: HTMLElement[] = [];
     for (const [key, value] of Object.entries(tags)) {
-      const attr = key.startsWith("og:") || key.startsWith("twitter:") ? "property" : "name";
-      // twitter: also uses name in practice
+      // Open Graph uses `property`; Twitter's cards are read from `name`.
       const isOg = key.startsWith("og:");
       let el = document.head.querySelector(
         isOg ? `meta[property="${key}"]` : `meta[name="${key}"]`,
