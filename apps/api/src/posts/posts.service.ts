@@ -42,6 +42,12 @@ export interface PresentedPost {
    */
   repostedBy: { username: string; displayName: string } | null;
   /**
+   * The author has blocked the caller, so every action on this post would be
+   * refused. Sent per post so a card can disable its own buttons rather than
+   * letting each one fail with a 403 after the click.
+   */
+  blockedByAuthor: boolean;
+  /**
    * The community it was posted into, for the "from <community>" footer.
    *
    * The join table allows a post in several communities, but composing only
@@ -169,7 +175,7 @@ export class PostsService {
     /** The post's own page shows notes still gathering ratings; timelines do not. */
     includePendingNotes = false,
   ): Promise<PresentedPost> {
-    const [author, notes, liked, reposted, bookmarked, quoted, replyParent] = await Promise.all([
+    const [author, notes, liked, reposted, bookmarked, quoted, replyParent, blocked] = await Promise.all([
       this.directory.tryGet(post.author.username),
       // Only the post's own page carries unrated notes. Broadcasting them to
       // every timeline would publish anything anyone writes to all readers,
@@ -205,6 +211,14 @@ export class PostsService {
             select: { id: true, author: { select: { username: true } } },
           })
         : Promise.resolve(null),
+      viewerId && viewerId !== post.authorId
+        ? this.prisma.block.findUnique({
+            where: {
+              blockerId_blockedId: { blockerId: post.authorId, blockedId: viewerId },
+            },
+            select: { blockerId: true },
+          })
+        : Promise.resolve(null),
     ]);
 
     return {
@@ -229,6 +243,7 @@ export class PostsService {
       media: await this.mediaService.describe(post.media.map((m) => m.mediaId)),
       poll: post.poll ? await this.presentPoll(post.poll, viewerId) : null,
       repostedBy: null,
+      blockedByAuthor: Boolean(blocked),
       community: post.communityPosts[0]?.community ?? null,
     };
   }
@@ -264,8 +279,16 @@ export class PostsService {
         400,
       );
     }
-    if (input.replyToId) await this.requirePost(input.replyToId);
-    if (input.quoteOfId) await this.requirePost(input.quoteOfId);
+    // Replying to and quoting a post are both interactions with its author, so
+    // a block stops them the same way it stops a like.
+    if (input.replyToId) {
+      const parent = await this.requirePost(input.replyToId);
+      await this.social.assertNotBlockedBy(author.id, parent.authorId);
+    }
+    if (input.quoteOfId) {
+      const quoted = await this.requirePost(input.quoteOfId);
+      await this.social.assertNotBlockedBy(author.id, quoted.authorId);
+    }
 
     const mediaIds = input.mediaIds ?? [];
     // Attaching someone else's upload would let one account put another's
@@ -449,6 +472,9 @@ export class PostsService {
     if (option.poll.expiresAt.getTime() <= Date.now()) {
       throw new DirectoryError("POLL_CLOSED", "This poll has closed.", 409);
     }
+    // Voting moves a number on someone else's post, so it is an interaction.
+    const owner = await this.requirePost(postId);
+    await this.social.assertNotBlockedBy(userId, owner.authorId);
 
     await this.prisma.$transaction(async (tx) => {
       const existing = await tx.pollVote.findUnique({
@@ -598,7 +624,8 @@ export class PostsService {
 
   /** Idempotent per account: liking twice leaves one like, and unlikes cleanly. */
   async setLike(id: string, userId: string, liked: boolean): Promise<PresentedPost> {
-    await this.requirePost(id);
+    const target = await this.requirePost(id);
+    await this.social.assertNotBlockedBy(userId, target.authorId);
     await this.prisma.$transaction(async (tx) => {
       const existing = await tx.postLike.findUnique({
         where: { userId_postId: { userId, postId: id } },
@@ -634,7 +661,8 @@ export class PostsService {
   }
 
   async setRepost(id: string, userId: string, reposted: boolean): Promise<PresentedPost> {
-    await this.requirePost(id);
+    const target = await this.requirePost(id);
+    await this.social.assertNotBlockedBy(userId, target.authorId);
     await this.prisma.$transaction(async (tx) => {
       const existing = await tx.postRepost.findUnique({
         where: { userId_postId: { userId, postId: id } },

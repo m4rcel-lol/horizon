@@ -5,6 +5,7 @@ import { useSession } from "../hooks/useSession";
 
 const sections = [
   { to: "/admin", label: "Overview", end: true, permission: PERMISSIONS.USERS_VIEW },
+  { to: "/admin/users", label: "Users", permission: PERMISSIONS.USERS_VIEW },
   { to: "/admin/statistics", label: "Statistics", permission: PERMISSIONS.USERS_VIEW },
   { to: "/admin/verification", label: "Verification", permission: PERMISSIONS.VERIFICATION_GRANT },
   { to: "/admin/notes", label: "Community Notes", permission: PERMISSIONS.MODERATION_MANAGE },

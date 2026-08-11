@@ -63,6 +63,25 @@ export class FollowController {
     return unwrap(() => this.social.resolveFollowRequest(auth.id, username, body.approve));
   }
 
+  /** Accounts the caller has blocked. */
+  @Get("blocks/mine")
+  async blocks(@CurrentUser() auth: AuthenticatedUser) {
+    return unwrap(async () => ({ users: await this.social.blocks(auth.id) }));
+  }
+
+  /**
+   * Block or unblock. A blocked account may not follow the caller, and may not
+   * act on anything the caller posts — but can still read them.
+   */
+  @Put(":username/block")
+  async setBlock(
+    @Param("username") username: string,
+    @Body() body: SetFlagDto,
+    @CurrentUser() auth: AuthenticatedUser,
+  ) {
+    return unwrap(() => this.social.setBlock(auth.id, username, body.on));
+  }
+
   /** Whether the caller follows them, and whether they follow back. */
   @Public()
   @Get(":username/relationship")

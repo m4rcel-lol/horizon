@@ -52,6 +52,10 @@ export class SocialService {
     });
 
     if (following && !existing) {
+      // A blocked account may not follow the account that blocked it. Checked
+      // before the protected-account branch so a block cannot be turned into a
+      // pending request that sits in the blocker's approval list.
+      await this.assertNotBlockedBy(followerId, target.id);
       if (target.isProtected) {
         const alreadyAsked = await this.prisma.followRequest.findUnique({
           where: { requesterId_targetId: { requesterId: followerId, targetId: target.id } },
@@ -99,6 +103,101 @@ export class SocialService {
     }
 
     return { user: await this.directory.get(username), following, requested: false };
+  }
+
+  /**
+   * Block or unblock an account.
+   *
+   * Blocking here means: they may not follow you, and they may not act on
+   * anything you post. It deliberately does not hide your posts — that is the
+   * shape this instance chose, and it is the reason `hiddenAuthorIds` (which
+   * is about private accounts) has nothing to do with blocks.
+   *
+   * Any follow between the two is dropped in both directions. Leaving one in
+   * place would keep the blocked account reading the blocker in their Following
+   * feed, which is the one thing a block has to stop.
+   */
+  async setBlock(blockerId: string, username: string, on: boolean) {
+    const target = await this.requireUser(username);
+    if (target.id === blockerId) {
+      throw new DirectoryError("CANNOT_BLOCK_SELF", "You cannot block yourself.", 400);
+    }
+    if (target.isSystem) {
+      throw new DirectoryError("CANNOT_BLOCK_SYSTEM", "System accounts cannot be blocked.", 400);
+    }
+
+    if (on) {
+      await this.prisma.$transaction(async (tx) => {
+        await tx.block.upsert({
+          where: { blockerId_blockedId: { blockerId, blockedId: target.id } },
+          create: { blockerId, blockedId: target.id },
+          update: {},
+        });
+        await tx.follow.deleteMany({
+          where: {
+            OR: [
+              { followerId: target.id, followingId: blockerId },
+              { followerId: blockerId, followingId: target.id },
+            ],
+          },
+        });
+        await tx.followRequest.deleteMany({
+          where: {
+            OR: [
+              { requesterId: target.id, targetId: blockerId },
+              { requesterId: blockerId, targetId: target.id },
+            ],
+          },
+        });
+        // A block is not an event the blocked account is told about, so the
+        // follow notification it leaves behind should not survive either.
+        await tx.notification.deleteMany({
+          where: {
+            OR: [
+              { recipientId: blockerId, actorId: target.id, type: { in: ["FOLLOW", "FOLLOW_REQUEST"] } },
+              { recipientId: target.id, actorId: blockerId, type: { in: ["FOLLOW", "FOLLOW_REQUEST"] } },
+            ],
+          },
+        });
+      });
+    } else {
+      await this.prisma.block.deleteMany({ where: { blockerId, blockedId: target.id } });
+    }
+
+    return { user: await this.directory.get(username), blocked: on };
+  }
+
+  /** Accounts this user has blocked. */
+  async blocks(userId: string): Promise<PresentedUser[]> {
+    const rows = await this.prisma.block.findMany({
+      where: { blockerId: userId },
+      orderBy: { createdAt: "desc" },
+      take: 200,
+      select: { blocked: { select: { username: true } } },
+    });
+    return this.presentAll(rows.map((r) => r.blocked.username));
+  }
+
+  /** Has `blockerId` blocked `blockedId`? */
+  async isBlockedBy(blockedId: string, blockerId: string): Promise<boolean> {
+    const row = await this.prisma.block.findUnique({
+      where: { blockerId_blockedId: { blockerId, blockedId } },
+      select: { blockerId: true },
+    });
+    return Boolean(row);
+  }
+
+  /**
+   * Refuse an interaction the blocked account is not allowed to make.
+   *
+   * Called by every write that acts on someone else's post or account, so the
+   * rule lives in one place rather than being restated at each call site.
+   */
+  async assertNotBlockedBy(actorId: string, ownerId: string) {
+    if (actorId === ownerId) return;
+    if (await this.isBlockedBy(actorId, ownerId)) {
+      throw new DirectoryError("BLOCKED", "You cannot interact with this account.", 403);
+    }
   }
 
   /** Pending requests to follow you, for the approval list. */
@@ -169,6 +268,8 @@ export class SocialService {
         isSelf: true,
         requested: false,
         canViewPosts: true,
+        blocking: false,
+        blockedBy: false,
       };
     }
     if (!viewerId) {
@@ -178,9 +279,11 @@ export class SocialService {
         isSelf: false,
         requested: false,
         canViewPosts: !target.isProtected,
+        blocking: false,
+        blockedBy: false,
       };
     }
-    const [out, back, pending] = await Promise.all([
+    const [out, back, pending, blocking, blockedBy] = await Promise.all([
       this.prisma.follow.findUnique({
         where: { followerId_followingId: { followerId: viewerId, followingId: target.id } },
         select: { followerId: true },
@@ -193,6 +296,14 @@ export class SocialService {
         where: { requesterId_targetId: { requesterId: viewerId, targetId: target.id } },
         select: { requesterId: true },
       }),
+      this.prisma.block.findUnique({
+        where: { blockerId_blockedId: { blockerId: viewerId, blockedId: target.id } },
+        select: { blockerId: true },
+      }),
+      this.prisma.block.findUnique({
+        where: { blockerId_blockedId: { blockerId: target.id, blockedId: viewerId } },
+        select: { blockerId: true },
+      }),
     ]);
     return {
       following: Boolean(out),
@@ -200,6 +311,13 @@ export class SocialService {
       isSelf: false,
       requested: Boolean(pending),
       canViewPosts: !target.isProtected || Boolean(out),
+      /** The caller has blocked them. */
+      blocking: Boolean(blocking),
+      /**
+       * They have blocked the caller. Sent so the interface can disable the
+       * controls up front instead of letting every button fail with a 403.
+       */
+      blockedBy: Boolean(blockedBy),
     };
   }
 

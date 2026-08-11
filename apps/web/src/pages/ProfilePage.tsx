@@ -63,6 +63,10 @@ export function ProfilePage() {
   // Saying "no posts yet" there would be a lie about the account rather than a
   // statement about the reader, so the two cases are told apart here.
   const withheld = Boolean(relationship && !relationship.canViewPosts);
+  // A block does not hide posts on this instance — it stops interaction — so
+  // the banner explains the disabled buttons rather than an empty timeline.
+  const blockedBy = Boolean(relationship?.blockedBy);
+  const blocking = Boolean(relationship?.blocking);
 
   const bannerSrc = localBanner || user?.bannerUrl || null;
   const avatarSrc =
@@ -251,6 +255,17 @@ export function ProfilePage() {
             </div>
 
             {user ? <ProfileCommunities username={user.username} /> : null}
+
+            {blockedBy || blocking ? (
+              <p
+                className="mt-3 rounded-2xl border p-3 text-[14px]"
+                style={{ borderColor: "var(--color-border)", color: "var(--color-text-secondary)" }}
+              >
+                {blockedBy
+                  ? `@${user?.username ?? handle} has blocked you. You can still read their posts, but you cannot follow them or reply, like, repost or quote anything they post.`
+                  : `You have blocked @${user?.username ?? handle}. They cannot follow you or interact with your posts. They can still read them.`}
+              </p>
+            ) : null}
           </>
         )}
       </div>

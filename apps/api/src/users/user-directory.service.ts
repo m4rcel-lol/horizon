@@ -282,6 +282,56 @@ export class UserDirectoryService implements OnModuleInit {
     return Promise.all(users.map((u) => this.present(u)));
   }
 
+  /**
+   * The administrator's view of the directory: searchable, filterable, paged.
+   *
+   * Separate from `list()` because that one is public and returns every account
+   * in one unbounded response — fine for a seed instance, useless for
+   * moderating a real one, and not something to widen with search filters that
+   * anonymous callers would also get.
+   */
+  async search(input: {
+    query?: string;
+    status?: AccountStatus | "ALL";
+    verified?: boolean;
+    page?: number;
+    perPage?: number;
+  }): Promise<{ users: PresentedUser[]; total: number; page: number; perPage: number }> {
+    const perPage = Math.min(Math.max(input.perPage ?? 25, 1), 100);
+    const page = Math.max(input.page ?? 1, 1);
+    const query = (input.query ?? "").trim();
+
+    const where = {
+      status:
+        input.status && input.status !== "ALL"
+          ? input.status
+          : ({ not: "DELETED" } as const),
+      ...(query
+        ? {
+            OR: [
+              { username: { contains: query, mode: "insensitive" as const } },
+              { displayName: { contains: query, mode: "insensitive" as const } },
+            ],
+          }
+        : {}),
+      ...(input.verified === true ? { verification: { not: "NONE" as const } } : {}),
+      ...(input.verified === false ? { verification: "NONE" as const } : {}),
+    };
+
+    const [rows, total] = await Promise.all([
+      this.prisma.user.findMany({
+        where,
+        orderBy: { createdAt: "desc" },
+        skip: (page - 1) * perPage,
+        take: perPage,
+        select: USER_SELECT,
+      }) as Promise<UserRow[]>,
+      this.prisma.user.count({ where }),
+    ]);
+
+    return { users: await Promise.all(rows.map((u) => this.present(u))), total, page, perPage };
+  }
+
   async get(username: string): Promise<PresentedUser> {
     return this.present(await this.row(username));
   }

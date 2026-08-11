@@ -1,17 +1,17 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { MoreIcon } from "../icons";
-import type { ApiUser } from "../api";
+import { api, type ApiUser } from "../api";
 import { useSession } from "../hooks/useSession";
 import { PERMISSIONS } from "@horizon/shared";
 
 /**
  * The overflow menu on a profile.
  *
- * It was a button with no handler. Every entry here does something real —
- * nothing is listed that would not work, which is why there is no Block or
- * Mute: those are modelled in the schema but have no implementation behind
- * them, and a menu item that silently does nothing is worse than its absence.
+ * Every entry here does something real. Mute is still absent for the reason
+ * Block used to be: it is modelled in the schema with nothing behind it, and a
+ * menu item that silently does nothing is worse than its absence.
  */
 export function ProfileMenu({ user }: { user: ApiUser | undefined }) {
   const navigate = useNavigate();
@@ -19,6 +19,26 @@ export function ProfileMenu({ user }: { user: ApiUser | undefined }) {
   const [open, setOpen] = useState(false);
   const [copied, setCopied] = useState<string | null>(null);
   const wrap = useRef<HTMLDivElement>(null);
+  const queryClient = useQueryClient();
+
+  const { data: relationship } = useQuery({
+    queryKey: ["relationship", user?.username],
+    queryFn: () => api.relationship(user!.username),
+    enabled: Boolean(user) && active?.username !== user?.username,
+    retry: false,
+  });
+
+  const block = useMutation({
+    mutationFn: (on: boolean) => api.setBlock(user!.username, on),
+    onSuccess: () => {
+      // Blocking drops any follow between the two, so the counts and the
+      // follow button are both stale until these refetch.
+      queryClient.invalidateQueries({ queryKey: ["relationship", user?.username] });
+      queryClient.invalidateQueries({ queryKey: ["user"] });
+      queryClient.invalidateQueries({ queryKey: ["blocks"] });
+      queryClient.invalidateQueries({ queryKey: ["posts"] });
+    },
+  });
 
   useEffect(() => {
     if (!open) return;
@@ -141,6 +161,22 @@ export function ProfileMenu({ user }: { user: ApiUser | undefined }) {
               }}
             >
               Settings and privacy
+            </button>
+          ) : null}
+
+          {!isSelf && active && !user.isSystem ? (
+            <button
+              type="button"
+              role="menuitem"
+              className={item}
+              disabled={block.isPending}
+              style={relationship?.blocking ? undefined : { color: "var(--color-danger, #f91880)" }}
+              onClick={() => {
+                setOpen(false);
+                block.mutate(!relationship?.blocking);
+              }}
+            >
+              {relationship?.blocking ? `Unblock @${user.username}` : `Block @${user.username}`}
             </button>
           ) : null}
 

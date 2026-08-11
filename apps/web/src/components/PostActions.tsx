@@ -16,6 +16,8 @@ function Action({
   active,
   activeColor,
   hoverColor,
+  disabled = false,
+  disabledTitle,
   children,
 }: {
   label: string;
@@ -23,6 +25,9 @@ function Action({
   active?: boolean;
   activeColor?: string;
   hoverColor: string;
+  /** Refused server-side anyway — shown dimmed rather than failing on click. */
+  disabled?: boolean;
+  disabledTitle?: string;
   children: ReactNode;
 }) {
   const [hover, setHover] = useState(false);
@@ -31,20 +36,31 @@ function Action({
       type="button"
       aria-label={label}
       aria-pressed={active}
-      title={label}
+      aria-disabled={disabled}
+      title={disabled ? disabledTitle ?? label : label}
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
       onClick={(event) => {
         // The whole row is a link to the post; an action is not navigation.
         event.preventDefault();
         event.stopPropagation();
+        if (disabled) return;
         onClick(event);
       }}
       className="group flex items-center gap-1 rounded-full transition-colors"
       style={{
         minHeight: 32,
         paddingRight: 8,
-        color: active && activeColor ? activeColor : hover ? hoverColor : "var(--color-text-secondary)",
+        opacity: disabled ? 0.45 : 1,
+        cursor: disabled ? "not-allowed" : undefined,
+        color:
+          disabled
+            ? "var(--color-text-secondary)"
+            : active && activeColor
+              ? activeColor
+              : hover
+                ? hoverColor
+                : "var(--color-text-secondary)",
       }}
     >
       {children}
@@ -153,6 +169,11 @@ export function PostActions({
     return false;
   };
 
+  // The author has blocked this reader: every one of these would come back
+  // 403, so they are dimmed rather than left live to fail.
+  const blocked = post.blockedByAuthor;
+  const blockedTitle = `@${post.author?.username ?? post.authorUsername} has blocked you`;
+
   const iconStyle = { width: size, height: size } as const;
 
   return (
@@ -160,7 +181,13 @@ export function PostActions({
       className="flex justify-between max-w-[425px] mt-3"
       onClick={(event) => event.stopPropagation()}
     >
-      <Action label="Reply" hoverColor="var(--color-primary)" onClick={() => requireSession() && onReply(post)}>
+      <Action
+        label="Reply"
+        hoverColor="var(--color-primary)"
+        disabled={blocked}
+        disabledTitle={blockedTitle}
+        onClick={() => requireSession() && onReply(post)}
+      >
         <span className="icon-btn group-hover:bg-[color-mix(in_srgb,var(--color-primary)_12%,transparent)]">
           <ReplyIcon style={iconStyle} />
         </span>
@@ -173,6 +200,8 @@ export function PostActions({
           hoverColor="var(--color-success, #00ba7c)"
           active={post.repostedByViewer}
           activeColor="var(--color-success, #00ba7c)"
+          disabled={blocked}
+          disabledTitle={blockedTitle}
           onClick={() => requireSession() && setRepostOpen((o) => !o)}
         >
           <span className="icon-btn group-hover:bg-[color-mix(in_srgb,#00ba7c_12%,transparent)]">
@@ -228,6 +257,8 @@ export function PostActions({
         hoverColor="var(--color-danger, #f91880)"
         active={post.likedByViewer}
         activeColor="var(--color-danger, #f91880)"
+        disabled={blocked}
+        disabledTitle={blockedTitle}
         onClick={() => requireSession() && like.mutate(!post.likedByViewer)}
       >
         <span className="icon-btn group-hover:bg-[color-mix(in_srgb,#f91880_12%,transparent)]">

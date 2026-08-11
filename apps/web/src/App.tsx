@@ -27,6 +27,7 @@ import { AdminVerificationPage } from "./pages/AdminVerificationPage";
 import { RequirePermission } from "./components/RequirePermission";
 import { AdminLayout } from "./layouts/AdminLayout";
 import { AdminOverviewPage } from "./pages/AdminOverviewPage";
+import { AdminUsersPage } from "./pages/AdminUsersPage";
 import { AdminStatisticsPage } from "./pages/AdminStatisticsPage";
 import { AdminNotesPage } from "./pages/AdminNotesPage";
 import { UserStatsPage } from "./pages/UserStatsPage";
@@ -66,6 +67,14 @@ export default function App() {
           element={
             <RequirePermission permission={PERMISSIONS.USERS_VIEW}>
               <AdminOverviewPage />
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="users"
+          element={
+            <RequirePermission permission={PERMISSIONS.USERS_VIEW}>
+              <AdminUsersPage />
             </RequirePermission>
           }
         />

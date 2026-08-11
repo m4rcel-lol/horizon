@@ -45,6 +45,9 @@ export function FollowButton({ username, className = "" }: { username: string; c
   // state: asked, and waiting. Pressing it again withdraws the request, which
   // is the same call as unfollowing.
   const requested = data?.requested ?? false;
+  // They blocked us: following is refused server-side, so the control says why
+  // instead of offering an action that cannot succeed.
+  const blockedBy = data?.blockedBy ?? false;
   const label = following
     ? hover
       ? "Unfollow"
@@ -54,6 +57,18 @@ export function FollowButton({ username, className = "" }: { username: string; c
         ? "Withdraw"
         : "Requested"
       : "Follow";
+
+  if (blockedBy) {
+    return (
+      <span
+        className={`btn btn-outline ${className}`}
+        style={{ color: "var(--color-text-secondary)", cursor: "default" }}
+        title="This account has blocked you"
+      >
+        Blocked
+      </span>
+    );
+  }
 
   return (
     <span className="inline-flex flex-col items-end">
