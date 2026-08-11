@@ -146,7 +146,7 @@ export function CommunityPage() {
             <ul>
               {posts.map((post) => (
                 <li key={post.id}>
-                  <PostCard post={post} />
+                  <PostCard post={post} showCommunity={false} />
                 </li>
               ))}
             </ul>

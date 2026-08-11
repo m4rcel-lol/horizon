@@ -65,6 +65,8 @@ export interface ApiPost {
   poll: ApiPoll | null;
   /** Set when the row is on a profile because that account reposted it. */
   repostedBy: { username: string; displayName: string } | null;
+  /** The community it was posted into, shown as "from <community>" beneath it. */
+  community: { slug: string; name: string; avatarUrl: string | null } | null;
 }
 
 export interface ApiCommunity {

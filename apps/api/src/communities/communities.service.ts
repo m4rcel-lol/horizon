@@ -2,6 +2,7 @@ import { Injectable, Logger } from "@nestjs/common";
 import { verificationPresentation, type VerificationType } from "@horizon/shared";
 import { PrismaService } from "../database/prisma.service";
 import { DirectoryError } from "../users/directory-error";
+import { PostsService, type PresentedPost } from "../posts/posts.service";
 
 export type CommunityJoinMode = "OPEN" | "REQUEST";
 
@@ -66,7 +67,10 @@ type CommunityRow = {
 export class CommunitiesService {
   private readonly logger = new Logger(CommunitiesService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly posts_: PostsService,
+  ) {}
 
   private present(
     row: CommunityRow,
@@ -437,47 +441,30 @@ export class CommunitiesService {
     return { ok: true };
   }
 
-  async posts(slug: string, _viewerId: string | null = null) {
+  /**
+   * The community's timeline.
+   *
+   * Posts are rendered by PostsService rather than assembled here, so a card on
+   * a community page carries the same author identity, counts, media and viewer
+   * state as it does anywhere else — building a second, thinner shape here is
+   * what left these rows with no avatar and every counter reading zero.
+   */
+  async posts(slug: string, viewerId: string | null = null): Promise<PresentedPost[]> {
     const community = await this.prisma.community.findUnique({
       where: { slug },
       select: { id: true },
     });
     if (!community) throw new DirectoryError("COMMUNITY_NOT_FOUND", `No community ${slug}.`, 404);
     const rows = await this.prisma.communityPost.findMany({
-      where: { communityId: community.id },
+      where: { communityId: community.id, post: { deletedAt: null } },
       orderBy: { createdAt: "desc" },
       take: 50,
-      select: {
-        post: {
-          select: {
-            id: true,
-            content: true,
-            createdAt: true,
-            author: { select: { username: true } },
-          },
-        },
-      },
+      select: { postId: true },
     });
-    return rows.map((r) => ({
-      id: r.post.id,
-      authorUsername: r.post.author.username,
-      content: r.post.content,
-      createdAt: r.post.createdAt.toISOString(),
-      author: null,
-      notes: [],
-      media: [],
-      likeCount: 0,
-      replyCount: 0,
-      repostCount: 0,
-      quoteCount: 0,
-      likedByViewer: false,
-      repostedByViewer: false,
-      bookmarkedByViewer: false,
-      deletableByViewer: false,
-      quoteOf: null,
-      replyTo: null,
-      poll: null,
-    }));
+    return this.posts_.byIds(
+      rows.map((r) => r.postId),
+      viewerId,
+    );
   }
 
   canCreate(verification: VerificationType, affiliated: boolean) {
