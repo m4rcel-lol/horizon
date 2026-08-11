@@ -64,6 +64,16 @@ come from it rather than from the request body. That matters for the threshold:
 it assumes distinct raters, and a client-supplied name let one reader clear it
 alone. See [`authorization.md`](authorization.md).
 
+**A pending note is shown on the post's own page**, marked as awaiting
+ratings and rateable there. Timelines carry only the notes readers accepted.
+Without this the system was a closed loop: a note was visible nowhere a reader
+would meet it, so it could never collect the ratings that would resolve it, and
+every note sat pending forever.
+
+**The threshold is configurable** — `notes.minRatings`, default 3, settable at
+Admin → Community Notes. Three is sensible on a busy instance and unreachable
+on one with four accounts.
+
 Notes and ratings are stored in Postgres. `status` is denormalised onto the row
 so a timeline can filter to visible notes without recounting ratings for every
 post it renders; it is recomputed inside the same transaction as the rating that
