@@ -78,22 +78,47 @@ export function CommunityPage() {
                     Settings
                   </button>
                 ) : null}
+                {isOwner ? (
+                  <Link to={`/communities/${community.slug}/requests`} className="btn btn-outline">
+                    Requests
+                  </Link>
+                ) : null}
                 {active ? (
                   community.joinedByViewer ? (
-                    <button type="button" className="btn btn-outline" onClick={() => leave.mutate()}>
+                    <button type="button" className="btn btn-outline" onClick={() => leave.mutate()} disabled={leave.isPending}>
                       Leave
                     </button>
+                  ) : community.pendingRequestByViewer ? (
+                    <button type="button" className="btn btn-outline" disabled>
+                      Requested
+                    </button>
                   ) : (
-                    <button type="button" className="btn btn-primary" onClick={() => join.mutate()}>
-                      Join
+                    <button
+                      type="button"
+                      className="btn btn-primary"
+                      onClick={() => join.mutate()}
+                      disabled={join.isPending}
+                    >
+                      {community.joinMode === "REQUEST" ? "Request to join" : "Join"}
                     </button>
                   )
                 ) : null}
               </div>
             </div>
-            <h2 className="mt-3 text-[20px] font-extrabold">{community.name}</h2>
+            <h2 className="mt-3 text-[20px] font-extrabold inline-flex items-center gap-1.5">
+              {community.name}
+              {community.verification === "INDIVIDUAL" ? (
+                <img
+                  src="/assets/verified.svg"
+                  alt="Verified"
+                  title="Verified community"
+                  className="w-5 h-5"
+                />
+              ) : null}
+            </h2>
             <p className="text-[15px]" style={{ color: "var(--color-text-secondary)" }}>
               c/{community.slug} · {community.memberCount} members
+              {community.joinMode === "REQUEST" ? " · Request to join" : ""}
             </p>
             {community.description ? <p className="mt-2 text-[15px]">{community.description}</p> : null}
             <p className="mt-1 text-[14px]" style={{ color: "var(--color-text-secondary)" }}>
@@ -132,6 +157,8 @@ export function CommunityPage() {
               slug={community.slug}
               avatarUrl={community.avatarUrl}
               bannerUrl={community.bannerUrl}
+              joinMode={community.joinMode ?? "OPEN"}
+              verification={community.verification ?? "NONE"}
               onClose={() => setSettingsOpen(false)}
               onSaved={() => {
                 setSettingsOpen(false);
@@ -149,17 +176,23 @@ function CommunitySettingsModal({
   slug,
   avatarUrl,
   bannerUrl,
+  joinMode: initialJoinMode = "OPEN",
+  verification: initialVerification = "NONE",
   onClose,
   onSaved,
 }: {
   slug: string;
   avatarUrl?: string | null;
   bannerUrl?: string | null;
+  joinMode?: "OPEN" | "REQUEST";
+  verification?: "NONE" | "INDIVIDUAL";
   onClose: () => void;
   onSaved: () => void;
 }) {
   const [avatar, setAvatar] = useState(avatarUrl ?? "");
   const [banner, setBanner] = useState(bannerUrl ?? "");
+  const [joinMode, setJoinMode] = useState<"OPEN" | "REQUEST">(initialJoinMode);
+  const [verification, setVerification] = useState<"NONE" | "INDIVIDUAL">(initialVerification);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -167,7 +200,7 @@ function CommunitySettingsModal({
     <div className="fixed inset-0 z-[100] flex items-start justify-center pt-[8vh] px-4">
       <button type="button" className="absolute inset-0 bg-black/40" aria-label="Close" onClick={onClose} />
       <form
-        className="relative w-full max-w-[480px] rounded-2xl border p-4 shadow-xl"
+        className="relative w-full max-w-[480px] max-h-[90vh] overflow-y-auto rounded-2xl border p-4 shadow-xl"
         style={{ background: "var(--color-bg)", borderColor: "var(--color-border)" }}
         onSubmit={async (e) => {
           e.preventDefault();
@@ -177,6 +210,8 @@ function CommunitySettingsModal({
             await api.updateCommunity(slug, {
               avatarUrl: avatar || null,
               bannerUrl: banner || null,
+              joinMode,
+              verification,
             });
             onSaved();
           } catch (err) {
@@ -187,10 +222,78 @@ function CommunitySettingsModal({
         }}
       >
         <h2 className="text-[20px] font-extrabold mb-4">Community settings</h2>
+
         <label className="x-label">Avatar URL</label>
         <input className="x-field mb-3" value={avatar} onChange={(e) => setAvatar(e.target.value)} />
         <label className="x-label">Banner URL</label>
         <input className="x-field mb-3" value={banner} onChange={(e) => setBanner(e.target.value)} />
+
+        <h3 className="text-[15px] font-bold mt-4 mb-2">Who can join</h3>
+        <fieldset className="space-y-2 mb-4">
+          {(
+            [
+              { value: "OPEN" as const, label: "Anyone can join", hint: "Membership is immediate" },
+              {
+                value: "REQUEST" as const,
+                label: "Request to join",
+                hint: "You approve each request",
+              },
+            ] as const
+          ).map((opt) => (
+            <label
+              key={opt.value}
+              className="flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer border"
+              style={{
+                borderColor: joinMode === opt.value ? "var(--color-primary)" : "var(--color-border)",
+              }}
+            >
+              <input
+                type="radio"
+                name="joinMode"
+                checked={joinMode === opt.value}
+                onChange={() => setJoinMode(opt.value)}
+                className="accent-[var(--color-primary)]"
+              />
+              <span>
+                <span className="block font-bold text-[14px]">{opt.label}</span>
+                <span className="block text-[12px]" style={{ color: "var(--color-text-secondary)" }}>
+                  {opt.hint}
+                </span>
+              </span>
+            </label>
+          ))}
+        </fieldset>
+
+        <h3 className="text-[15px] font-bold mt-2 mb-2">Verification</h3>
+        <p className="text-[13px] mb-2" style={{ color: "var(--color-text-secondary)" }}>
+          Communities may only use the normal (blue) verification badge.
+        </p>
+        <fieldset className="space-y-2 mb-4">
+          {(
+            [
+              { value: "NONE" as const, label: "Not verified" },
+              { value: "INDIVIDUAL" as const, label: "Verified (blue badge)" },
+            ] as const
+          ).map((opt) => (
+            <label
+              key={opt.value}
+              className="flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer border"
+              style={{
+                borderColor: verification === opt.value ? "var(--color-primary)" : "var(--color-border)",
+              }}
+            >
+              <input
+                type="radio"
+                name="verification"
+                checked={verification === opt.value}
+                onChange={() => setVerification(opt.value)}
+                className="accent-[var(--color-primary)]"
+              />
+              <span className="font-bold text-[14px]">{opt.label}</span>
+            </label>
+          ))}
+        </fieldset>
+
         {error ? <p className="text-red-500 text-[14px] mb-2">{error}</p> : null}
         <div className="flex justify-end gap-2">
           <button type="button" className="btn btn-outline" onClick={onClose}>

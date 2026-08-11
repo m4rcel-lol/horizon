@@ -11,6 +11,7 @@ import { BookmarksPage } from "./pages/BookmarksPage";
 import { ListsPage } from "./pages/ListsPage";
 import { CommunitiesPage } from "./pages/CommunitiesPage";
 import { CommunityPage } from "./pages/CommunityPage";
+import { CommunityJoinRequestsPage } from "./pages/CommunityJoinRequestsPage";
 import { HashtagPage } from "./pages/HashtagPage";
 import { ProfilePage } from "./pages/ProfilePage";
 import { AffiliatesPage } from "./pages/AffiliatesPage";
@@ -130,6 +131,7 @@ export default function App() {
           <Route path="privacy" element={<SettingsPrivacyPage />} />
         </Route>
         <Route path="/communities/:slug" element={<CommunityPage />} />
+        <Route path="/communities/:slug/requests" element={<CommunityJoinRequestsPage />} />
         <Route path="/:username/affiliates" element={<AffiliatesPage />} />
         <Route path="/:username/stats" element={<UserStatsPage />} />
         <Route path="/:username/followers" element={<FollowListPage mode="followers" />} />

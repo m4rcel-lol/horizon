@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { LikeIcon, RepostIcon, ReplyIcon, QuoteIcon, ProfileIcon } from "../icons";
+import { LikeIcon, RepostIcon, ReplyIcon, QuoteIcon, ProfileIcon, CommunitiesIcon } from "../icons";
 import { api, type ApiNotification } from "../api";
 import { Avatar, NameWithBadges } from "../components/Verification";
 import { useSession } from "../hooks/useSession";
@@ -27,6 +27,8 @@ function describe(n: ApiNotification) {
       return { Icon: QuoteIcon, colour: "var(--color-primary)", text: "mentioned you" };
     case "FOLLOW":
       return { Icon: ProfileIcon, colour: "var(--color-primary)", text: "followed you" };
+    case "COMMUNITY":
+      return { Icon: CommunitiesIcon, colour: "var(--color-primary)", text: "wants to join your community" };
     default:
       return { Icon: ProfileIcon, colour: "var(--color-primary)", text: "did something" };
   }
@@ -110,11 +112,13 @@ export function NotificationsPage() {
           {notifications.map((n) => {
             const { Icon, colour, text } = describe(n);
             const handle = n.actor?.username;
-            const to = n.postId
-              ? `/${n.actor?.username ?? "i"}/status/${n.postId}`
-              : handle
-                ? `/${handle}`
-                : "/home";
+            const to =
+              (n as { href?: string | null }).href ||
+              (n.postId
+                ? `/${n.actor?.username ?? "i"}/status/${n.postId}`
+                : handle
+                  ? `/${handle}`
+                  : "/home");
             return (
               <li key={n.id}>
                 <Link

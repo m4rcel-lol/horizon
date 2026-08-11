@@ -8,13 +8,17 @@ export type NotificationKind =
   | "REPOST"
   | "QUOTE"
   | "MENTION"
-  | "FOLLOW";
+  | "FOLLOW"
+  | "COMMUNITY";
 
 export interface PresentedNotification {
   id: string;
   type: NotificationKind;
   actor: PresentedUser | null;
   postId: string | null;
+  communityId: string | null;
+  /** Deep-link path when the notification should open a specific page. */
+  href: string | null;
   /** A short excerpt, so the row says something without loading the post. */
   excerpt: string | null;
   read: boolean;
@@ -135,15 +139,33 @@ export class NotificationsService {
     );
     const excerpts = new Map(posts.map((p) => [p.id, p.content.slice(0, 140)]));
 
-    return rows.map((row) => ({
-      id: row.id,
-      type: row.type as NotificationKind,
-      actor: row.actorId ? presentedActors.get(row.actorId) ?? null : null,
-      postId: row.postId,
-      excerpt: row.postId ? excerpts.get(row.postId) ?? null : null,
-      read: row.readAt !== null,
-      createdAt: row.createdAt.toISOString(),
-    }));
+    return rows.map((row) => {
+      const data = (row.data ?? {}) as {
+        kind?: string;
+        communitySlug?: string;
+        communityName?: string;
+        requestId?: string;
+      };
+      let href: string | null = null;
+      let excerpt: string | null = row.postId ? excerpts.get(row.postId) ?? null : null;
+      if (row.type === "COMMUNITY" && data.kind === "JOIN_REQUEST" && data.communitySlug) {
+        href = `/communities/${data.communitySlug}/requests`;
+        excerpt = data.communityName
+          ? `wants to join ${data.communityName}`
+          : "wants to join a community";
+      }
+      return {
+        id: row.id,
+        type: row.type as NotificationKind,
+        actor: row.actorId ? presentedActors.get(row.actorId) ?? null : null,
+        postId: row.postId,
+        communityId: row.communityId ?? null,
+        href,
+        excerpt,
+        read: row.readAt !== null,
+        createdAt: row.createdAt.toISOString(),
+      };
+    });
   }
 
   async unreadCount(userId: string): Promise<number> {

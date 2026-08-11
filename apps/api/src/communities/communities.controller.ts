@@ -1,6 +1,6 @@
 import { Body, Controller, Get, HttpException, Param, Patch, Post, Put, Query } from "@nestjs/common";
-import { IsBoolean, IsOptional, IsString, Length } from "class-validator";
-import { CommunitiesService } from "./communities.service";
+import { IsBoolean, IsIn, IsOptional, IsString, Length } from "class-validator";
+import { CommunitiesService, type CommunityJoinMode } from "./communities.service";
 import { DirectoryError } from "../users/directory-error";
 import { CurrentUser, Public } from "../auth/auth.decorators";
 import type { AuthenticatedUser } from "../auth/authenticated-user";
@@ -23,6 +23,34 @@ class CreateCommunityDto {
 class SetFlagDto {
   @IsBoolean()
   on!: boolean;
+}
+
+class UpdateCommunityDto {
+  @IsOptional()
+  @IsString()
+  avatarUrl?: string | null;
+
+  @IsOptional()
+  @IsString()
+  bannerUrl?: string | null;
+
+  @IsOptional()
+  @IsString()
+  description?: string;
+
+  @IsOptional()
+  @IsIn(["OPEN", "REQUEST"])
+  joinMode?: CommunityJoinMode;
+
+  /** Communities may only use the normal (blue) badge, or none. */
+  @IsOptional()
+  @IsIn(["NONE", "INDIVIDUAL"])
+  verification?: "NONE" | "INDIVIDUAL";
+}
+
+class ResolveRequestDto {
+  @IsBoolean()
+  approve!: boolean;
 }
 
 @Controller("communities")
@@ -51,7 +79,6 @@ export class CommunitiesController {
     };
   }
 
-  /** Verified accounts only — checked in the service, which owns the rule. */
   @Post()
   async create(@Body() body: CreateCommunityDto, @CurrentUser() auth: AuthenticatedUser) {
     return this.unwrap(async () => ({
@@ -81,7 +108,7 @@ export class CommunitiesController {
   @Patch(":slug")
   async update(
     @Param("slug") slug: string,
-    @Body() body: { avatarUrl?: string | null; bannerUrl?: string | null; description?: string },
+    @Body() body: UpdateCommunityDto,
     @CurrentUser() auth: AuthenticatedUser,
   ) {
     return this.unwrap(async () => ({
@@ -95,5 +122,25 @@ export class CommunitiesController {
     return this.unwrap(async () => ({
       posts: await this.communities.posts(slug, auth?.id ?? null),
     }));
+  }
+
+  /** Pending join requests — community owner only. */
+  @Get(":slug/join-requests")
+  async joinRequests(@Param("slug") slug: string, @CurrentUser() auth: AuthenticatedUser) {
+    return this.unwrap(async () => ({
+      requests: await this.communities.listJoinRequests(slug, auth.id),
+    }));
+  }
+
+  @Post(":slug/join-requests/:requestId")
+  async resolveJoinRequest(
+    @Param("slug") slug: string,
+    @Param("requestId") requestId: string,
+    @Body() body: ResolveRequestDto,
+    @CurrentUser() auth: AuthenticatedUser,
+  ) {
+    return this.unwrap(async () =>
+      this.communities.resolveJoinRequest(slug, requestId, auth.id, body.approve),
+    );
   }
 }

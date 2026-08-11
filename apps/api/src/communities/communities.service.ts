@@ -1,7 +1,9 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable, Logger } from "@nestjs/common";
 import { verificationPresentation, type VerificationType } from "@horizon/shared";
 import { PrismaService } from "../database/prisma.service";
 import { DirectoryError } from "../users/directory-error";
+
+export type CommunityJoinMode = "OPEN" | "REQUEST";
 
 export interface PresentedCommunity {
   id: string;
@@ -11,9 +13,25 @@ export interface PresentedCommunity {
   avatarUrl: string | null;
   bannerUrl: string | null;
   memberCount: number;
+  joinMode: CommunityJoinMode;
+  /** Only NONE or INDIVIDUAL for communities. */
+  verification: "NONE" | "INDIVIDUAL";
   owner: { username: string; displayName: string };
-  /** Whether the caller is a member, so the button reads Join or Leave. */
   joinedByViewer: boolean;
+  /** Viewer has a pending join request (REQUEST mode). */
+  pendingRequestByViewer: boolean;
+}
+
+export interface PresentedJoinRequest {
+  id: string;
+  createdAt: string;
+  user: {
+    id: string;
+    username: string;
+    displayName: string;
+    avatarUrl: string | null;
+  };
+  community: { slug: string; name: string };
 }
 
 const COMMUNITY_SELECT = {
@@ -24,6 +42,9 @@ const COMMUNITY_SELECT = {
   avatarUrl: true,
   bannerUrl: true,
   memberCount: true,
+  joinMode: true,
+  verification: true,
+  ownerId: true,
   owner: { select: { username: true, displayName: true } },
 } as const;
 
@@ -35,39 +56,67 @@ type CommunityRow = {
   avatarUrl: string | null;
   bannerUrl: string | null;
   memberCount: number;
+  joinMode: string;
+  verification: string;
+  ownerId: string;
   owner: { username: string; displayName: string };
 };
 
-/**
- * Communities.
- *
- * Only verified accounts may create one. An unverified instance would fill up
- * with squatted names within a day, and a community carries the weight of a
- * shared space — the verification requirement is the same judgement the
- * affiliation system makes about who can vouch for whom.
- */
 @Injectable()
 export class CommunitiesService {
+  private readonly logger = new Logger(CommunitiesService.name);
+
   constructor(private readonly prisma: PrismaService) {}
 
-  private present(row: CommunityRow, joined: boolean): PresentedCommunity {
-    return { ...row, joinedByViewer: joined };
+  private present(
+    row: CommunityRow,
+    joined: boolean,
+    pendingRequest: boolean,
+  ): PresentedCommunity {
+    const verification: "NONE" | "INDIVIDUAL" =
+      row.verification === "INDIVIDUAL" ? "INDIVIDUAL" : "NONE";
+    return {
+      id: row.id,
+      slug: row.slug,
+      name: row.name,
+      description: row.description,
+      avatarUrl: row.avatarUrl,
+      bannerUrl: row.bannerUrl,
+      memberCount: row.memberCount,
+      joinMode: row.joinMode === "REQUEST" ? "REQUEST" : "OPEN",
+      verification,
+      owner: row.owner,
+      joinedByViewer: joined,
+      pendingRequestByViewer: pendingRequest,
+    };
   }
 
   private async withMembership(
     rows: CommunityRow[],
     viewerId: string | null,
   ): Promise<PresentedCommunity[]> {
-    if (!viewerId || rows.length === 0) return rows.map((r) => this.present(r, false));
-    const mine = await this.prisma.communityMember.findMany({
-      where: { userId: viewerId, communityId: { in: rows.map((r) => r.id) } },
-      select: { communityId: true },
-    });
+    if (!viewerId || rows.length === 0) {
+      return rows.map((r) => this.present(r, false, false));
+    }
+    const [mine, pending] = await Promise.all([
+      this.prisma.communityMember.findMany({
+        where: { userId: viewerId, communityId: { in: rows.map((r) => r.id) } },
+        select: { communityId: true },
+      }),
+      this.prisma.communityJoinRequest.findMany({
+        where: {
+          userId: viewerId,
+          status: "pending",
+          communityId: { in: rows.map((r) => r.id) },
+        },
+        select: { communityId: true },
+      }),
+    ]);
     const joined = new Set(mine.map((m) => m.communityId));
-    return rows.map((r) => this.present(r, joined.has(r.id)));
+    const pendingIds = new Set(pending.map((p) => p.communityId));
+    return rows.map((r) => this.present(r, joined.has(r.id), pendingIds.has(r.id)));
   }
 
-  /** A URL-safe slug from the name, made unique with a suffix if taken. */
   private async slugFor(name: string) {
     const base =
       name
@@ -83,71 +132,13 @@ export class CommunitiesService {
       });
       if (!taken) return slug;
     }
-    throw new DirectoryError("SLUG_TAKEN", "Pick a different name for the community.", 409);
-  }
-
-  async create(input: {
-    ownerId: string;
-    name: string;
-    description?: string;
-    avatarUrl?: string;
-  }): Promise<PresentedCommunity> {
-    const owner = await this.prisma.user.findUnique({
-      where: { id: input.ownerId },
-      select: { id: true, verification: true, affiliatedToId: true, isSystem: true },
-    });
-    if (!owner) throw new DirectoryError("USER_NOT_FOUND", "No such account.", 404);
-    if (owner.isSystem) {
-      throw new DirectoryError(
-        "SYSTEM_ACCOUNT_IMMUTABLE",
-        "System accounts cannot own communities.",
-        403,
-      );
-    }
-
-    // Verified on their own merits, or verified through an affiliation — both
-    // mean somebody has vouched for this account.
-    const verified =
-      owner.verification !== "NONE" || owner.affiliatedToId !== null;
-    if (!verified) {
-      throw new DirectoryError(
-        "VERIFICATION_REQUIRED",
-        "Only verified accounts can create a community.",
-        403,
-      );
-    }
-
-    const name = input.name.trim();
-    if (name.length < 3) {
-      throw new DirectoryError("NAME_TOO_SHORT", "Give the community a name of at least 3 characters.", 400);
-    }
-
-    const slug = await this.slugFor(name);
-    const community = (await this.prisma.$transaction(async (tx) => {
-      const created = await tx.community.create({
-        data: {
-          ownerId: owner.id,
-          name,
-          slug,
-          description: input.description?.trim() || null,
-          avatarUrl: input.avatarUrl || null,
-          memberCount: 1,
-        },
-        select: COMMUNITY_SELECT,
-      });
-      // The owner is a member: a community with a member count of zero that
-      // somebody owns is a contradiction.
-      await tx.communityMember.create({ data: { communityId: created.id, userId: owner.id } });
-      return created;
-    })) as CommunityRow;
-
-    return this.present(community, true);
+    return `${base}-${Date.now().toString(36)}`;
   }
 
   async list(viewerId: string | null = null): Promise<PresentedCommunity[]> {
     const rows = (await this.prisma.community.findMany({
-      orderBy: [{ memberCount: "desc" }, { createdAt: "desc" }],
-      take: 100,
+      orderBy: { memberCount: "desc" },
+      take: 50,
       select: COMMUNITY_SELECT,
     })) as CommunityRow[];
     return this.withMembership(rows, viewerId);
@@ -163,61 +154,159 @@ export class CommunitiesService {
     return presented;
   }
 
-  /** The communities pinned to an account's profile: the ones it belongs to. */
   async forUser(username: string, viewerId: string | null = null): Promise<PresentedCommunity[]> {
-    const rows = (await this.prisma.community
-      .findMany({
-        where: { members: { some: { user: { username } } } },
-        orderBy: { memberCount: "desc" },
-        take: 10,
-        select: COMMUNITY_SELECT,
-      })) as CommunityRow[];
+    const rows = (await this.prisma.community.findMany({
+      where: { members: { some: { user: { username } } } },
+      orderBy: { memberCount: "desc" },
+      take: 10,
+      select: COMMUNITY_SELECT,
+    })) as CommunityRow[];
     return this.withMembership(rows, viewerId);
   }
 
+  async create(input: {
+    ownerId: string;
+    name: string;
+    description?: string;
+    avatarUrl?: string;
+  }): Promise<PresentedCommunity> {
+    const owner = await this.prisma.user.findUnique({
+      where: { id: input.ownerId },
+      select: { id: true, verification: true, affiliatedToId: true },
+    });
+    if (!owner) throw new DirectoryError("NOT_FOUND", "Account not found.", 404);
+    if (!this.canCreate(owner.verification as VerificationType, Boolean(owner.affiliatedToId))) {
+      throw new DirectoryError(
+        "FORBIDDEN",
+        "Only verified accounts can create a community.",
+        403,
+      );
+    }
+    const slug = await this.slugFor(input.name);
+    const community = await this.prisma.community.create({
+      data: {
+        ownerId: input.ownerId,
+        name: input.name.trim(),
+        slug,
+        description: input.description?.trim() || null,
+        avatarUrl: input.avatarUrl || null,
+        joinMode: "OPEN",
+        verification: "NONE",
+        members: { create: { userId: input.ownerId } },
+        memberCount: 1,
+      },
+      select: COMMUNITY_SELECT,
+    });
+    return this.present(community as CommunityRow, true, false);
+  }
+
+  /**
+   * Join or leave. OPEN mode joins immediately. REQUEST mode creates a pending
+   * request and notifies the community owner.
+   */
   async setMembership(slug: string, userId: string, join: boolean): Promise<PresentedCommunity> {
     const community = await this.prisma.community.findUnique({
       where: { slug },
-      select: { id: true, ownerId: true },
+      select: { id: true, ownerId: true, joinMode: true, name: true, slug: true },
     });
     if (!community) throw new DirectoryError("COMMUNITY_NOT_FOUND", `No community ${slug}.`, 404);
-    if (!join && community.ownerId === userId) {
-      throw new DirectoryError(
-        "OWNER_CANNOT_LEAVE",
-        "You own this community, so you cannot leave it.",
-        400,
-      );
+
+    if (!join) {
+      if (community.ownerId === userId) {
+        throw new DirectoryError(
+          "OWNER_CANNOT_LEAVE",
+          "You own this community, so you cannot leave it.",
+          400,
+        );
+      }
+      await this.prisma.$transaction(async (tx) => {
+        const existing = await tx.communityMember.findUnique({
+          where: { communityId_userId: { communityId: community.id, userId } },
+          select: { userId: true },
+        });
+        if (existing) {
+          await tx.communityMember.delete({
+            where: { communityId_userId: { communityId: community.id, userId } },
+          });
+          await tx.community.update({
+            where: { id: community.id },
+            data: { memberCount: { decrement: 1 } },
+          });
+        }
+        // Cancel any pending request so the UI is clean.
+        await tx.communityJoinRequest.deleteMany({
+          where: { communityId: community.id, userId },
+        });
+      });
+      return this.get(slug, userId);
     }
 
-    await this.prisma.$transaction(async (tx) => {
-      const existing = await tx.communityMember.findUnique({
-        where: { communityId_userId: { communityId: community.id, userId } },
-        select: { userId: true },
-      });
-      if (join && !existing) {
-        await tx.communityMember.create({ data: { communityId: community.id, userId } });
-        await tx.community.update({
-          where: { id: community.id },
-          data: { memberCount: { increment: 1 } },
-        });
-      } else if (!join && existing) {
-        await tx.communityMember.delete({
-          where: { communityId_userId: { communityId: community.id, userId } },
-        });
-        await tx.community.update({
-          where: { id: community.id },
-          data: { memberCount: { decrement: 1 } },
-        });
-      }
+    // Already a member?
+    const already = await this.prisma.communityMember.findUnique({
+      where: { communityId_userId: { communityId: community.id, userId } },
+      select: { userId: true },
     });
+    if (already) return this.get(slug, userId);
 
+    if (community.joinMode === "REQUEST") {
+      // Upsert pending request; notify owner once.
+      const existing = await this.prisma.communityJoinRequest.findUnique({
+        where: { communityId_userId: { communityId: community.id, userId } },
+      });
+      if (existing?.status === "pending") return this.get(slug, userId);
+
+      const request = await this.prisma.communityJoinRequest.upsert({
+        where: { communityId_userId: { communityId: community.id, userId } },
+        create: { communityId: community.id, userId, status: "pending" },
+        update: { status: "pending", resolvedAt: null, createdAt: new Date() },
+      });
+
+      try {
+        await this.prisma.notification.create({
+          data: {
+            recipientId: community.ownerId,
+            actorId: userId,
+            type: "COMMUNITY",
+            communityId: community.id,
+            data: {
+              kind: "JOIN_REQUEST",
+              requestId: request.id,
+              communitySlug: community.slug,
+              communityName: community.name,
+            },
+          },
+        });
+      } catch (error) {
+        this.logger.warn(`Could not notify owner of join request: ${error}`);
+      }
+
+      return this.get(slug, userId);
+    }
+
+    // OPEN: join immediately.
+    await this.prisma.$transaction(async (tx) => {
+      await tx.communityMember.create({ data: { communityId: community.id, userId } });
+      await tx.community.update({
+        where: { id: community.id },
+        data: { memberCount: { increment: 1 } },
+      });
+      await tx.communityJoinRequest.deleteMany({
+        where: { communityId: community.id, userId },
+      });
+    });
     return this.get(slug, userId);
   }
 
   async update(
     slug: string,
     actorId: string,
-    changes: { avatarUrl?: string | null; bannerUrl?: string | null; description?: string },
+    changes: {
+      avatarUrl?: string | null;
+      bannerUrl?: string | null;
+      description?: string;
+      joinMode?: CommunityJoinMode;
+      verification?: "NONE" | "INDIVIDUAL";
+    },
   ): Promise<PresentedCommunity> {
     const community = await this.prisma.community.findUnique({
       where: { slug },
@@ -227,18 +316,127 @@ export class CommunitiesService {
     if (community.ownerId !== actorId) {
       throw new DirectoryError("FORBIDDEN", "Only the owner can edit this community.", 403);
     }
+    if (changes.verification !== undefined && changes.verification !== "NONE" && changes.verification !== "INDIVIDUAL") {
+      throw new DirectoryError(
+        "INVALID_VERIFICATION",
+        "Communities may only use the normal (blue) verification badge, or none.",
+        400,
+      );
+    }
     await this.prisma.community.update({
       where: { id: community.id },
       data: {
         ...(changes.avatarUrl !== undefined ? { avatarUrl: changes.avatarUrl } : {}),
         ...(changes.bannerUrl !== undefined ? { bannerUrl: changes.bannerUrl } : {}),
         ...(changes.description !== undefined ? { description: changes.description } : {}),
+        ...(changes.joinMode !== undefined ? { joinMode: changes.joinMode } : {}),
+        ...(changes.verification !== undefined ? { verification: changes.verification } : {}),
       },
     });
     return this.get(slug, actorId);
   }
 
-  /** Posts shared into this community (CommunityPost join table). */
+  /** Pending join requests for a community (owner only). */
+  async listJoinRequests(slug: string, actorId: string): Promise<PresentedJoinRequest[]> {
+    const community = await this.prisma.community.findUnique({
+      where: { slug },
+      select: { id: true, ownerId: true, slug: true, name: true },
+    });
+    if (!community) throw new DirectoryError("COMMUNITY_NOT_FOUND", `No community ${slug}.`, 404);
+    if (community.ownerId !== actorId) {
+      throw new DirectoryError("FORBIDDEN", "Only the owner can review join requests.", 403);
+    }
+    const rows = await this.prisma.communityJoinRequest.findMany({
+      where: { communityId: community.id, status: "pending" },
+      orderBy: { createdAt: "asc" },
+      select: {
+        id: true,
+        createdAt: true,
+        user: {
+          select: { id: true, username: true, displayName: true, avatarUrl: true },
+        },
+      },
+    });
+    return rows.map((r) => ({
+      id: r.id,
+      createdAt: r.createdAt.toISOString(),
+      user: r.user,
+      community: { slug: community.slug, name: community.name },
+    }));
+  }
+
+  /**
+   * Approve: add as member, drop request.
+   * Decline: delete request so it looks like they never asked.
+   */
+  async resolveJoinRequest(
+    slug: string,
+    requestId: string,
+    actorId: string,
+    approve: boolean,
+  ): Promise<{ ok: true }> {
+    const community = await this.prisma.community.findUnique({
+      where: { slug },
+      select: { id: true, ownerId: true },
+    });
+    if (!community) throw new DirectoryError("COMMUNITY_NOT_FOUND", `No community ${slug}.`, 404);
+    if (community.ownerId !== actorId) {
+      throw new DirectoryError("FORBIDDEN", "Only the owner can review join requests.", 403);
+    }
+
+    const request = await this.prisma.communityJoinRequest.findFirst({
+      where: { id: requestId, communityId: community.id, status: "pending" },
+      select: { id: true, userId: true },
+    });
+    if (!request) {
+      throw new DirectoryError("REQUEST_NOT_FOUND", "That join request is no longer pending.", 404);
+    }
+
+    if (approve) {
+      await this.prisma.$transaction(async (tx) => {
+        const existing = await tx.communityMember.findUnique({
+          where: {
+            communityId_userId: { communityId: community.id, userId: request.userId },
+          },
+          select: { userId: true },
+        });
+        if (!existing) {
+          await tx.communityMember.create({
+            data: { communityId: community.id, userId: request.userId },
+          });
+          await tx.community.update({
+            where: { id: community.id },
+            data: { memberCount: { increment: 1 } },
+          });
+        }
+        await tx.communityJoinRequest.delete({ where: { id: request.id } });
+        // Clear related notifications for the owner.
+        await tx.notification.deleteMany({
+          where: {
+            recipientId: actorId,
+            type: "COMMUNITY",
+            communityId: community.id,
+            actorId: request.userId,
+          },
+        });
+      });
+    } else {
+      // Decline: remove the request entirely so it never happened.
+      await this.prisma.$transaction(async (tx) => {
+        await tx.communityJoinRequest.delete({ where: { id: request.id } });
+        await tx.notification.deleteMany({
+          where: {
+            recipientId: actorId,
+            type: "COMMUNITY",
+            communityId: community.id,
+            actorId: request.userId,
+          },
+        });
+      });
+    }
+    return { ok: true };
+  }
+
   async posts(slug: string, _viewerId: string | null = null) {
     const community = await this.prisma.community.findUnique({
       where: { slug },
@@ -260,7 +458,6 @@ export class CommunitiesService {
         },
       },
     });
-    // Lightweight shape — full present goes through PostsService when wired.
     return rows.map((r) => ({
       id: r.post.id,
       authorUsername: r.post.author.username,
@@ -283,8 +480,11 @@ export class CommunitiesService {
     }));
   }
 
-  /** Whether an account may create one, so the button can be hidden rather than refused. */
   canCreate(verification: VerificationType, affiliated: boolean) {
-    return verification !== "NONE" || affiliated || verificationPresentation(verification).isOrganisation;
+    return (
+      verification !== "NONE" ||
+      affiliated ||
+      verificationPresentation(verification).isOrganisation
+    );
   }
 }

@@ -70,8 +70,18 @@ export interface ApiCommunity {
   avatarUrl: string | null;
   bannerUrl?: string | null;
   memberCount: number;
+  joinMode?: "OPEN" | "REQUEST";
+  verification?: "NONE" | "INDIVIDUAL";
   owner: { username: string; displayName: string };
   joinedByViewer: boolean;
+  pendingRequestByViewer?: boolean;
+}
+
+export interface ApiCommunityJoinRequest {
+  id: string;
+  createdAt: string;
+  user: { id: string; username: string; displayName: string; avatarUrl: string | null };
+  community: { slug: string; name: string };
 }
 
 export interface DailyPoint {
@@ -125,9 +135,11 @@ export interface ScheduledPost {
 
 export interface ApiNotification {
   id: string;
-  type: "LIKE" | "REPLY" | "REPOST" | "QUOTE" | "MENTION" | "FOLLOW";
+  type: "LIKE" | "REPLY" | "REPOST" | "QUOTE" | "MENTION" | "FOLLOW" | "COMMUNITY";
   actor: ApiUser | null;
   postId: string | null;
+  communityId?: string | null;
+  href?: string | null;
   excerpt: string | null;
   read: boolean;
   createdAt: string;
@@ -288,12 +300,27 @@ export const api = {
     }),
   updateCommunity: (
     slug: string,
-    body: { avatarUrl?: string | null; bannerUrl?: string | null; description?: string },
+    body: {
+      avatarUrl?: string | null;
+      bannerUrl?: string | null;
+      description?: string;
+      joinMode?: "OPEN" | "REQUEST";
+      verification?: "NONE" | "INDIVIDUAL";
+    },
   ) =>
     request<{ community: ApiCommunity }>(`/communities/${encodeURIComponent(slug)}`, {
       method: "PATCH",
       body: JSON.stringify(body),
     }),
+  communityJoinRequests: (slug: string) =>
+    request<{ requests: ApiCommunityJoinRequest[] }>(
+      `/communities/${encodeURIComponent(slug)}/join-requests`,
+    ),
+  resolveCommunityJoinRequest: (slug: string, requestId: string, approve: boolean) =>
+    request<{ ok: boolean }>(
+      `/communities/${encodeURIComponent(slug)}/join-requests/${encodeURIComponent(requestId)}`,
+      { method: "POST", body: JSON.stringify({ approve }) },
+    ),
   joinCommunity: (slug: string) =>
     request<{ community: ApiCommunity }>(`/communities/${encodeURIComponent(slug)}/membership`, {
       method: "PUT",

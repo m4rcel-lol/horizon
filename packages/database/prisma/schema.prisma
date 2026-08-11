@@ -97,6 +97,7 @@ model User {
   listFollows       ListFollower[]
   communitiesOwned  Community[]    @relation("CommunityOwner")
   communityMemberships CommunityMember[]
+  communityJoinRequests CommunityJoinRequest[]
   reportsFiled      Report[]       @relation("Reporter")
   reportsAgainst    Report[]       @relation("ReportedUser")
   moderationActions ModerationAction[] @relation("ModerationTarget")
@@ -690,6 +691,12 @@ enum CommunityVisibility {
   PRIVATE
 }
 
+/// How people join: OPEN is immediate membership; REQUEST needs owner approval.
+enum CommunityJoinMode {
+  OPEN
+  REQUEST
+}
+
 model Community {
   id           String               @id @default(cuid())
   ownerId      String
@@ -700,18 +707,39 @@ model Community {
   avatarUrl    String?
   bannerUrl    String?
   visibility   CommunityVisibility  @default(PUBLIC)
+  joinMode     CommunityJoinMode    @default(OPEN)
+  /// Only NONE or INDIVIDUAL (the normal blue badge) are allowed for communities.
+  verification VerificationType     @default(NONE)
   memberCount  Int                  @default(0)
   postCount    Int                  @default(0)
   createdAt    DateTime             @default(now())
   updatedAt    DateTime             @updatedAt
 
-  owner     User              @relation("CommunityOwner", fields: [ownerId], references: [id])
-  members   CommunityMember[]
-  posts     CommunityPost[]
-  roles     CommunityRole[]
+  owner         User                   @relation("CommunityOwner", fields: [ownerId], references: [id])
+  members       CommunityMember[]
+  posts         CommunityPost[]
+  roles         CommunityRole[]
+  joinRequests  CommunityJoinRequest[]
 
   @@index([slug])
   @@index([ownerId])
+}
+
+model CommunityJoinRequest {
+  id          String   @id @default(cuid())
+  communityId String
+  userId      String
+  /// pending | approved | declined — declined rows are deleted so it looks like no request was made
+  status      String   @default("pending")
+  createdAt   DateTime @default(now())
+  resolvedAt  DateTime?
+
+  community Community @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([communityId, userId])
+  @@index([communityId, status])
+  @@index([userId])
 }
 
 model CommunityMember {
