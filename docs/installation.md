@@ -170,6 +170,30 @@ docker compose down -v               # -v also removes the Postgres volume
 docker compose up -d --build
 ```
 
+## Running out of disk
+
+`no space left on device` during a build is almost always Docker's build cache
+rather than the machine being genuinely full. Check both:
+
+```bash
+df -h /
+docker system df
+```
+
+Reclaim, safest first:
+
+```bash
+docker builder prune -af     # build cache — usually the biggest win
+docker image prune -af       # images nothing references any more
+```
+
+**Do not run `docker system prune --volumes` or `docker compose down -v`** unless
+you mean it: both delete the Postgres volume, and with it every account and post.
+
+Three images each install the full workspace, so repeated `--no-cache` rebuilds
+accumulate quickly. Prefer a plain `docker compose build` and keep `--no-cache`
+for when a cached layer is actually wrong.
+
 ## Production Notes
 
 - Point DNS A/AAAA records for `horizon.european-commission-europa.eu` (and `www`) to the host

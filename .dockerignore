@@ -1,0 +1,37 @@
+# Keep the build context small. Everything here is either rebuilt inside the
+# image, mounted at runtime, or has no business in a container at all.
+
+# Version control and CI
+.git
+.github
+.gitignore
+
+# Screenshots — tens of megabytes that are documentation, not application code
+demo
+
+# Documentation
+docs
+*.md
+LICENSE
+
+# Dependencies and build output: the image installs and builds its own
+node_modules
+**/node_modules
+dist
+**/dist
+.turbo
+**/.turbo
+**/*.tsbuildinfo
+
+# Local environment and editor state. .env especially must never be baked into
+# an image — compose passes it in at runtime.
+.env
+.env.*
+!.env.example
+.vscode
+.idea
+.DS_Store
+
+# Local infrastructure config, mounted rather than copied
+infra
+docker-compose*.yml
