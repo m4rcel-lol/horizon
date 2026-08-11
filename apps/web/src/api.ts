@@ -158,6 +158,11 @@ export interface ApiUser {
   bio?: string;
   /** Public avatar URL; falls back to default when null. */
   avatarUrl?: string | null;
+  bannerUrl?: string | null;
+  website?: string | null;
+  location?: string | null;
+  pronouns?: string | null;
+  birthday?: string | null;
   /** Tier granted directly, before affiliation is taken into account. */
   verification: VerificationType;
   /** Badge actually displayed. */
@@ -172,9 +177,13 @@ export interface ApiUser {
   status: "ACTIVE" | "SUSPENDED";
   isSystem: boolean;
   loginDisabled: boolean;
-  bannerUrl?: string | null;
+  isAdmin?: boolean;
+  /** Private account — follows require approval. */
+  isProtected?: boolean;
   followingCount?: number;
   followersCount?: number;
+  automatedBy?: { username: string; displayName: string } | null;
+  automatedPending?: boolean;
   createdAt: string;
 }
 
