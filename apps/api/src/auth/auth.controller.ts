@@ -6,6 +6,8 @@ import { UserDirectoryService } from "../users/user-directory.service";
 import { DirectoryError } from "../users/directory-error";
 import { CurrentUser, Public } from "./auth.decorators";
 import type { AuthenticatedUser } from "./authenticated-user";
+import { PERMISSIONS } from "@horizon/shared";
+import { InstanceSettingsService } from "../instance/instance-settings.service";
 
 class RegisterDto {
   @IsString()
@@ -48,7 +50,28 @@ export class AuthController {
   constructor(
     private readonly auth: AuthService,
     private readonly directory: UserDirectoryService,
+    private readonly settings: InstanceSettingsService,
   ) {}
+
+  /**
+   * Refuse a sign-in that would hand a session to someone the instance is
+   * closed to.
+   *
+   * The guard alone would let them hold a session and see 503 on every screen.
+   * Refusing here means maintenance is what it says: only administrators are
+   * inside. Checked after the credentials, so it never reveals whether an
+   * account exists to someone who guessed wrong.
+   */
+  private async assertMayEnterDuringMaintenance(userId: string) {
+    if (!this.settings.get("maintenance.enabled")) return;
+    if (await this.auth.hasPermission(userId, PERMISSIONS.SYSTEM_MANAGE)) return;
+    throw new DirectoryError(
+      "MAINTENANCE_MODE",
+      (this.settings.get("maintenance.message") as string) ||
+        "This instance is down for maintenance.",
+      503,
+    );
+  }
 
   private async unwrap<T>(fn: () => Promise<T>): Promise<T> {
     try {
@@ -104,6 +127,7 @@ export class AuthController {
   async login(@Body() body: LoginDto, @Req() req: Request, @Res({ passthrough: true }) res: Response) {
     return this.unwrap(async () => {
       const user = await this.auth.verifyCredentials(body.identifier, body.password);
+      await this.assertMayEnterDuringMaintenance(user.id);
       const { token, expiresAt } = await this.auth.createSession(user.id, this.clientMeta(req));
       this.setSessionCookie(res, token, body.remember ?? true);
       return {
@@ -134,6 +158,8 @@ export class AuthController {
       if (!resolved) {
         throw new DirectoryError("INVALID_SESSION", "That session has expired. Sign in again.", 401);
       }
+      // Switching accounts is signing in by another name.
+      await this.assertMayEnterDuringMaintenance(resolved.user.id);
       this.setSessionCookie(res, token, true);
       return {
         user: await this.directory.get(resolved.user.username),
