@@ -14,9 +14,20 @@ import type { AuthenticatedUser } from "../auth/authenticated-user";
  * Matched against the path with the /api prefix already stripped by Nest.
  */
 const ALWAYS_OPEN = [
+  // Orchestrators and load balancers have no session to present.
   /^\/?health(\/|$)/,
-  /^\/?auth(\/|$)/,
+  // Only the routes an administrator needs to get in, plus the two that let a
+  // non-administrator be told what is going on and sign themselves out. The
+  // rest of /auth — registration and session management — is part of the site
+  // and is closed with everything else. Signing in is separately refused for
+  // anyone without the permission, so reaching this route is not access.
+  /^\/?auth\/login$/,
+  /^\/?auth\/switch$/,
+  /^\/?auth\/logout$/,
+  /^\/?auth\/me$/,
+  // The client reads this to know it is in maintenance and what to say.
   /^\/?instance$/,
+  // Where the mode gets turned back off.
   /^\/?instance\/settings(\/|$)/,
 ];
 

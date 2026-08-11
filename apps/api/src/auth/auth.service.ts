@@ -137,6 +137,24 @@ export class AuthService {
     return { id: user.id, username: user.username, displayName: user.displayName };
   }
 
+  /**
+   * Does this account hold a permission?
+   *
+   * Needed before a session exists — the maintenance check at sign-in has to
+   * know whether the credentials belong to an administrator, and by then
+   * `resolveSession` has nothing to resolve.
+   */
+  async hasPermission(userId: string, key: string): Promise<boolean> {
+    const row = await this.prisma.userRole.findFirst({
+      where: {
+        userId,
+        role: { permissions: { some: { permission: { key } } } },
+      },
+      select: { userId: true },
+    });
+    return Boolean(row);
+  }
+
   async createSession(userId: string, meta: { userAgent?: string; ipAddress?: string }) {
     const token = randomBytes(32).toString("base64url");
     const expiresAt = new Date(Date.now() + SESSION_IDLE_DAYS * 86400_000);
