@@ -32,6 +32,8 @@ export interface ApiNote {
   ratingsNeeded: number;
   publishedBy: string;
   createdAt: string;
+  /** How the caller rated it, so their own vote shows as chosen. */
+  viewerRating: boolean | null;
 }
 
 export interface ApiPost {
@@ -41,7 +43,10 @@ export interface ApiPost {
   createdAt: string;
   /** Resolved at read time, so badges and avatar shape travel with the post. */
   author: ApiUser | null;
-  /** Only notes readers rated helpful. */
+  /**
+   * Notes on the post. Timelines carry only the ones readers accepted; the
+   * post's own page also carries those still gathering ratings.
+   */
   notes: ApiNote[];
   likeCount: number;
   replyCount: number;
@@ -347,6 +352,15 @@ export const api = {
     }),
   listCommunityPosts: (slug: string) =>
     request<{ posts: ApiPost[] }>(`/communities/${encodeURIComponent(slug)}/posts`),
+
+  // Instance settings
+  instanceSettings: () =>
+    request<{ settings: Record<string, unknown> }>("/instance/settings"),
+  updateInstanceSettings: (partial: Record<string, unknown>) =>
+    request<{ settings: Record<string, unknown> }>("/instance/settings", {
+      method: "PATCH",
+      body: JSON.stringify(partial),
+    }),
 
   // Statistics
   instanceStats: () => request<{ stats: InstanceStats }>("/stats/instance"),

@@ -51,9 +51,20 @@ export const COMMUNITY_NOTE_UNHELPFUL_RATIO = 1 / 3;
  * reading the numbers can predict the outcome, and a note that has not been
  * rated enough is pending rather than silently treated as rejected.
  */
-export function communityNoteStatus(helpful: number, notHelpful: number): CommunityNoteStatus {
+export function communityNoteStatus(
+  helpful: number,
+  notHelpful: number,
+  /**
+   * How many ratings a note needs before it can resolve.
+   *
+   * Configurable because the right number depends on how many people are
+   * around to rate: three is sensible on a busy instance and unreachable on
+   * one with four accounts, where a note would sit pending forever.
+   */
+  minRatings: number = COMMUNITY_NOTE_MIN_RATINGS,
+): CommunityNoteStatus {
   const total = helpful + notHelpful;
-  if (total < COMMUNITY_NOTE_MIN_RATINGS) return "NEEDS_MORE_RATINGS";
+  if (total < minRatings) return "NEEDS_MORE_RATINGS";
   const ratio = helpful / total;
   if (ratio >= COMMUNITY_NOTE_HELPFUL_RATIO) return "HELPFUL";
   if (ratio <= COMMUNITY_NOTE_UNHELPFUL_RATIO) return "NOT_HELPFUL";
@@ -66,8 +77,12 @@ export function isNoteVisibleOnPost(status: CommunityNoteStatus): boolean {
 }
 
 /** How many more ratings a pending note needs before it can resolve. */
-export function ratingsUntilRated(helpful: number, notHelpful: number): number {
-  return Math.max(0, COMMUNITY_NOTE_MIN_RATINGS - (helpful + notHelpful));
+export function ratingsUntilRated(
+  helpful: number,
+  notHelpful: number,
+  minRatings: number = COMMUNITY_NOTE_MIN_RATINGS,
+): number {
+  return Math.max(0, minRatings - (helpful + notHelpful));
 }
 
 /**

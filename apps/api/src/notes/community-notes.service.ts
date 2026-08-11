@@ -11,6 +11,7 @@ import {
 } from "@horizon/shared";
 import { PrismaService } from "../database/prisma.service";
 import { DirectoryError } from "../users/directory-error";
+import { InstanceSettingsService } from "../instance/instance-settings.service";
 
 export interface CommunityNote {
   id: string;
@@ -76,10 +77,19 @@ type NoteRow = {
  */
 @Injectable()
 export class CommunityNotesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly settings: InstanceSettingsService,
+  ) {}
+
+  /** How many ratings resolve a note here. Operators can lower it. */
+  private get minRatings(): number {
+    const value = Number(this.settings.get("notes.minRatings"));
+    return Number.isFinite(value) && value >= 1 ? Math.floor(value) : 3;
+  }
 
   private present(note: NoteRow, viewerRating: boolean | null = null): PresentedNote {
-    const status = communityNoteStatus(note.helpfulCount, note.notHelpfulCount);
+    const status = communityNoteStatus(note.helpfulCount, note.notHelpfulCount, this.minRatings);
     return {
       id: note.id,
       postId: note.postId,
@@ -94,7 +104,7 @@ export class CommunityNotesService {
       statusLabel: COMMUNITY_NOTE_STATUS_LABELS[status],
       classificationLabel: COMMUNITY_NOTE_CLASSIFICATION_LABELS[note.classification],
       visibleOnPost: isNoteVisibleOnPost(status),
-      ratingsNeeded: ratingsUntilRated(note.helpfulCount, note.notHelpfulCount),
+      ratingsNeeded: ratingsUntilRated(note.helpfulCount, note.notHelpfulCount, this.minRatings),
       totalRatings: note.helpfulCount + note.notHelpfulCount,
       publishedBy: COMMUNITY_NOTES_ACCOUNT.username,
       viewerRating,
@@ -139,7 +149,7 @@ export class CommunityNotesService {
         classification: input.classification ?? "MISSING_CONTEXT",
         body: input.body,
         sourceUrl: input.sourceUrl ?? null,
-        status: communityNoteStatus(0, 0),
+        status: communityNoteStatus(0, 0, this.minRatings),
       },
       select: NOTE_SELECT,
     })) as NoteRow;
@@ -168,10 +178,16 @@ export class CommunityNotesService {
   }
 
   /**
-   * Notes shown on a post — helpful ones only.
+   * Notes on a post.
+   *
+   * A timeline gets only the notes readers accepted. The post's own page also
+   * gets the ones still awaiting ratings — otherwise a pending note is visible
+   * nowhere a reader would meet it, and can never collect the ratings that
+   * would resolve it. That was a closed loop: notes were written, shown only on
+   * /notes, and stayed pending forever.
    *
    * Filtered on the stored status in the query rather than by loading every
-   * note and recomputing, because this runs once per post in a timeline.
+   * note and recomputing, because the timeline path runs once per post.
    */
   async forPost(
     postId: string,
@@ -185,7 +201,8 @@ export class CommunityNotesService {
           ? { in: ["HELPFUL", "NEEDS_MORE_RATINGS"] }
           : "HELPFUL",
       },
-      orderBy: { createdAt: "desc" },
+      // Accepted notes first: the one readers agreed on leads.
+      orderBy: [{ status: "asc" }, { createdAt: "desc" }],
       select: NOTE_SELECT,
     })) as NoteRow[];
     return this.withViewerRatings(notes, viewerId);
@@ -228,7 +245,7 @@ export class CommunityNotesService {
         data: {
           helpfulCount,
           notHelpfulCount,
-          status: communityNoteStatus(helpfulCount, notHelpfulCount),
+          status: communityNoteStatus(helpfulCount, notHelpfulCount, this.minRatings),
         },
         select: NOTE_SELECT,
       })) as NoteRow;

@@ -193,7 +193,8 @@ export class PostsController {
   @Public()
   @Get(":id")
   async get(@Param("id") id: string, @CurrentUser() auth: AuthenticatedUser | null) {
-    return this.unwrap(async () => ({ post: await this.posts.get(id, auth?.id ?? null) }));
+    // true: the post's own page is where a pending note can be rated.
+    return this.unwrap(async () => ({ post: await this.posts.get(id, auth?.id ?? null, true) }));
   }
 
   @Public()

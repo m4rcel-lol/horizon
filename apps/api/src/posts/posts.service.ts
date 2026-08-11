@@ -152,10 +152,15 @@ export class PostsService {
     post: PostRow,
     viewerId: string | null,
     depth = 0,
+    /** The post's own page shows notes still gathering ratings; timelines do not. */
+    includePendingNotes = false,
   ): Promise<PresentedPost> {
     const [author, notes, liked, reposted, bookmarked, quoted, replyParent] = await Promise.all([
       this.directory.tryGet(post.author.username),
-      this.notes.forPost(post.id, viewerId, { includePending: true }),
+      // Only the post's own page carries unrated notes. Broadcasting them to
+      // every timeline would publish anything anyone writes to all readers,
+      // which is the gate Community Notes exists to impose.
+      this.notes.forPost(post.id, viewerId, { includePending: includePendingNotes }),
       viewerId
         ? this.prisma.postLike.findUnique({
             where: { userId_postId: { userId: viewerId, postId: post.id } },
@@ -483,13 +488,24 @@ export class PostsService {
     return merged.slice(0, 100).map((m) => m.post);
   }
 
-  async get(id: string, viewerId: string | null = null): Promise<PresentedPost> {
+  /**
+   * One post in full.
+   *
+   * `withPendingNotes` is what the post's own page asks for: a note still
+   * gathering ratings has to be visible somewhere a reader can rate it, and
+   * this is that place.
+   */
+  async get(
+    id: string,
+    viewerId: string | null = null,
+    withPendingNotes = false,
+  ): Promise<PresentedPost> {
     const post = (await this.prisma.post.findFirst({
       where: { id, deletedAt: null },
       select: POST_SELECT,
     })) as PostRow | null;
     if (!post) throw new DirectoryError("POST_NOT_FOUND", `No post ${id} on this instance.`, 404);
-    return this.present(post, viewerId);
+    return this.present(post, viewerId, 0, withPendingNotes);
   }
 
   /** Direct replies, oldest first, the way a conversation reads. */

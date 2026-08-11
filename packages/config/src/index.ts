@@ -85,6 +85,9 @@ export const DEFAULT_INSTANCE_SETTINGS = {
   "instance.defaultTheme": "system",
   "instance.contactEmail": "",
 
+  // Community Notes
+  "notes.minRatings": 3,
+
   // Registration
   "registration.enabled": true,
   "registration.requireApproval": false,
