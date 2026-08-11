@@ -40,11 +40,11 @@ export function HomePage() {
 
   return (
     <div>
-      <header className="x-header">
+      <header className="x-header hidden md:flex">
         <h1 className="x-title">Home</h1>
       </header>
 
-      <div className="x-tabs sticky top-[53px] z-10" role="tablist" aria-label="Timeline">
+      <div className="x-tabs sticky top-[53px] md:top-[53px] z-10" role="tablist" aria-label="Timeline">
         {tabs.map((t) => (
           <button
             key={t.id}
