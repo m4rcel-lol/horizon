@@ -7,14 +7,15 @@
     <meta name="theme-color" content="#000000" />
     <title>Horizon</title>
     <script>
-      // Set the theme before first paint so the page never flashes the wrong
-      // background. Mirrors resolveTheme() in src/theme.ts.
+      // Apply theme before first paint (mirrors resolveTheme in src/theme.ts).
+      // Preference: light | dark | system (default system).
       (function () {
         try {
           var saved = localStorage.getItem("horizon:theme");
-          var dark =
-            saved === "dark" ||
-            (saved !== "light" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+          var dark;
+          if (saved === "dark") dark = true;
+          else if (saved === "light") dark = false;
+          else dark = window.matchMedia("(prefers-color-scheme: dark)").matches;
           document.documentElement.classList.toggle("dark", dark);
           document
             .querySelector('meta[name="theme-color"]')

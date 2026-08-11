@@ -1,14 +1,21 @@
+import { useState } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowLeftIcon, MoreIcon } from "../icons";
 import { api, ApiError } from "../api";
 import { Avatar, NameWithBadges, VerifiedBadge } from "../components/Verification";
 import { PostCard } from "../components/PostCard";
+import { EditProfileModal } from "../components/EditProfileModal";
+import { useSession } from "../hooks/useSession";
 
 export function ProfilePage() {
   const { username } = useParams();
   const navigate = useNavigate();
-  const handle = username ?? "";
+  const { active } = useSession();
+  const handle = username ?? active?.username ?? "";
+  const [editOpen, setEditOpen] = useState(false);
+  const [localAvatar, setLocalAvatar] = useState<string | null>(null);
+  const [localBanner, setLocalBanner] = useState<string | null>(null);
 
   const { data, isLoading, error } = useQuery({
     queryKey: ["user", handle],
@@ -19,6 +26,12 @@ export function ProfilePage() {
 
   const user = data?.user;
   const notFound = error instanceof ApiError && error.status === 404;
+  const isOwnProfile =
+    Boolean(active) &&
+    (username === undefined ||
+      username === "profile" ||
+      (user && active?.username === user.username) ||
+      active?.username === handle);
 
   const { data: postData } = useQuery({
     queryKey: ["posts", handle],
@@ -42,12 +55,30 @@ export function ProfilePage() {
         </div>
       </header>
 
-      <div className="h-[200px]" style={{ background: "var(--color-bg-secondary)" }} />
+      <div className="relative h-[200px]" style={{ background: "var(--color-bg-secondary)" }}>
+        {localBanner ? (
+          <img src={localBanner} alt="" className="absolute inset-0 w-full h-full object-cover" />
+        ) : null}
+      </div>
 
       <div className="px-4 pb-3">
         <div className="flex justify-between items-start">
           <div className="-mt-[66px]">
-            <Avatar shape={user?.avatarShape ?? "circle"} size={133} ring />
+            {localAvatar ? (
+              <img
+                src={localAvatar}
+                alt=""
+                className="rounded-full object-cover border-4"
+                style={{
+                  width: 133,
+                  height: 133,
+                  borderColor: "var(--color-bg)",
+                  background: "var(--color-bg-secondary)",
+                }}
+              />
+            ) : (
+              <Avatar shape={user?.avatarShape ?? "circle"} size={133} ring />
+            )}
           </div>
           <div className="flex items-center gap-2 pt-3">
             <button
@@ -58,9 +89,15 @@ export function ProfilePage() {
             >
               <MoreIcon className="w-4 h-4" />
             </button>
-            <button type="button" className="btn btn-outline">
-              Follow
-            </button>
+            {isOwnProfile ? (
+              <button type="button" className="btn btn-outline" onClick={() => setEditOpen(true)}>
+                Edit profile
+              </button>
+            ) : (
+              <button type="button" className="btn btn-outline">
+                Follow
+              </button>
+            )}
           </div>
         </div>
 
@@ -68,7 +105,7 @@ export function ProfilePage() {
           <p className="mt-4 text-[15px]" style={{ color: "var(--color-text-secondary)" }}>
             Loading profile…
           </p>
-        ) : notFound ? (
+        ) : notFound && !isOwnProfile ? (
           <div className="mt-4">
             <h2 className="text-[20px] font-extrabold">This account doesn&apos;t exist</h2>
             <p className="text-[15px] mt-1" style={{ color: "var(--color-text-secondary)" }}>
@@ -80,7 +117,7 @@ export function ProfilePage() {
             <div className="mt-3">
               <h2 className="text-[20px] font-extrabold leading-6">
                 <NameWithBadges
-                  displayName={user?.displayName ?? `@${handle}`}
+                  displayName={user?.displayName ?? active?.displayName ?? `@${handle}`}
                   verification={user?.effectiveVerification ?? "NONE"}
                   affiliatedTo={user?.affiliatedTo}
                   badgeClassName="w-5 h-5"
@@ -89,7 +126,7 @@ export function ProfilePage() {
                 />
               </h2>
               <p className="text-[15px]" style={{ color: "var(--color-text-secondary)" }}>
-                @{user?.username ?? handle}
+                @{user?.username ?? active?.username ?? handle}
               </p>
             </div>
 
@@ -131,7 +168,11 @@ export function ProfilePage() {
 
             {user && user.affiliateCount > 0 ? (
               <p className="mt-1 text-[14px]">
-                <Link to={`/${user.username}/affiliates`} className="hover:underline" style={{ color: "var(--color-text-secondary)" }}>
+                <Link
+                  to={`/${user.username}/affiliates`}
+                  className="hover:underline"
+                  style={{ color: "var(--color-text-secondary)" }}
+                >
                   <strong style={{ color: "var(--color-text)" }}>{user.affiliateCount}</strong> affiliated{" "}
                   {user.affiliateCount === 1 ? "account" : "accounts"}
                 </Link>
@@ -169,9 +210,29 @@ export function ProfilePage() {
       ) : (
         <div className="empty-state">
           <h2>No posts yet</h2>
-          <p>When @{user?.username ?? handle} posts, it will show up here.</p>
+          <p>When @{user?.username ?? handle || "you"} posts, it will show up here.</p>
         </div>
       )}
+
+      <EditProfileModal
+        open={editOpen}
+        onClose={() => setEditOpen(false)}
+        displayName={user?.displayName ?? active?.displayName ?? ""}
+        bio={user?.bio}
+        avatarUrl={localAvatar || active?.avatarUrl}
+        bannerUrl={localBanner}
+        onSave={({ avatarFile, bannerFile }) => {
+          // Preview locally until media upload API is connected.
+          if (avatarFile) {
+            if (localAvatar) URL.revokeObjectURL(localAvatar);
+            setLocalAvatar(URL.createObjectURL(avatarFile));
+          }
+          if (bannerFile) {
+            if (localBanner) URL.revokeObjectURL(localBanner);
+            setLocalBanner(URL.createObjectURL(bannerFile));
+          }
+        }}
+      />
     </div>
   );
 }

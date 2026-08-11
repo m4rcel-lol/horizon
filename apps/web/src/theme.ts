@@ -1,49 +1,60 @@
 import { useCallback, useEffect, useState } from "react";
 
-export type Theme = "light" | "dark";
+/** Explicit user preference. "system" follows the OS. */
+export type ThemePreference = "light" | "dark" | "system";
+
+/** Resolved palette actually applied to the document. */
+export type ResolvedTheme = "light" | "dark";
 
 const STORAGE_KEY = "horizon:theme";
 
-/** The user's saved choice, or the OS preference when they have not chosen. */
-export function resolveTheme(): Theme {
+export function getStoredPreference(): ThemePreference {
   try {
     const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved === "light" || saved === "dark") return saved;
+    if (saved === "light" || saved === "dark" || saved === "system") return saved;
+    // Legacy: older builds only stored "light" | "dark"
   } catch {
-    // localStorage can throw in private modes; fall through to the OS setting
+    // private mode
   }
+  return "system";
+}
+
+export function resolveTheme(preference: ThemePreference = getStoredPreference()): ResolvedTheme {
+  if (preference === "light" || preference === "dark") return preference;
+  if (typeof window === "undefined") return "dark";
   return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
 }
 
-export function applyTheme(theme: Theme) {
+export function applyTheme(resolved: ResolvedTheme) {
   const root = document.documentElement;
-  root.classList.toggle("dark", theme === "dark");
+  root.classList.toggle("dark", resolved === "dark");
   document
     .querySelector('meta[name="theme-color"]')
-    ?.setAttribute("content", theme === "dark" ? "#000000" : "#ffffff");
+    ?.setAttribute("content", resolved === "dark" ? "#000000" : "#ffffff");
+}
+
+export function persistPreference(preference: ThemePreference) {
+  try {
+    localStorage.setItem(STORAGE_KEY, preference);
+  } catch {
+    // Preference will not survive reloads in private mode
+  }
 }
 
 /**
- * Tailwind is configured with darkMode: "class", so something has to set the
- * class — previously nothing did and the dark palette was unreachable.
+ * Theme hook used by Settings → Appearance and the quick toggle.
+ * Preference is light | dark | system; the document always gets a resolved theme.
  */
 export function useTheme() {
-  const [theme, setTheme] = useState<Theme>(() =>
-    document.documentElement.classList.contains("dark") ? "dark" : "light",
-  );
+  const [preference, setPreferenceState] = useState<ThemePreference>(() => getStoredPreference());
+  const [theme, setTheme] = useState<ResolvedTheme>(() => resolveTheme());
 
-  // Follow the OS while the user has no explicit preference stored.
   useEffect(() => {
     const media = window.matchMedia("(prefers-color-scheme: dark)");
     const onChange = () => {
-      let stored: string | null = null;
-      try {
-        stored = localStorage.getItem(STORAGE_KEY);
-      } catch {
-        stored = null;
-      }
-      if (stored === "light" || stored === "dark") return;
-      const next: Theme = media.matches ? "dark" : "light";
+      const pref = getStoredPreference();
+      if (pref !== "system") return;
+      const next = resolveTheme("system");
       setTheme(next);
       applyTheme(next);
     };
@@ -51,18 +62,18 @@ export function useTheme() {
     return () => media.removeEventListener("change", onChange);
   }, []);
 
-  const toggle = useCallback(() => {
-    setTheme((current) => {
-      const next: Theme = current === "dark" ? "light" : "dark";
-      applyTheme(next);
-      try {
-        localStorage.setItem(STORAGE_KEY, next);
-      } catch {
-        // Preference simply will not persist; the toggle still works this session
-      }
-      return next;
-    });
+  const setPreference = useCallback((next: ThemePreference) => {
+    persistPreference(next);
+    setPreferenceState(next);
+    const resolved = resolveTheme(next);
+    setTheme(resolved);
+    applyTheme(resolved);
   }, []);
 
-  return { theme, toggle };
+  /** Quick flip between light and dark (sets an explicit preference). */
+  const toggle = useCallback(() => {
+    setPreference(theme === "dark" ? "light" : "dark");
+  }, [theme, setPreference]);
+
+  return { theme, preference, setPreference, toggle };
 }

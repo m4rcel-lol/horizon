@@ -17,6 +17,12 @@ import { LoginPage } from "./pages/LoginPage";
 import { RegisterPage } from "./pages/RegisterPage";
 import { AdminSettingsPage } from "./pages/AdminSettingsPage";
 import { AdminVerificationPage } from "./pages/AdminVerificationPage";
+import {
+  SettingsPage,
+  SettingsAppearancePage,
+  SettingsAccountPage,
+  SettingsPrivacyPage,
+} from "./pages/SettingsPage";
 
 export default function App() {
   return (
@@ -34,11 +40,14 @@ export default function App() {
         <Route path="/messages" element={<MessagesPage />} />
         <Route path="/bookmarks" element={<BookmarksPage />} />
         <Route path="/notes" element={<CommunityNotesPage />} />
-        {/* These were linked from the nav but had no route, so they fell
-            through to /:username and rendered as profiles. */}
         <Route path="/lists" element={<ListsPage />} />
         <Route path="/communities" element={<CommunitiesPage />} />
         <Route path="/profile" element={<ProfilePage />} />
+        <Route path="/settings" element={<SettingsPage />}>
+          <Route path="appearance" element={<SettingsAppearancePage />} />
+          <Route path="account" element={<SettingsAccountPage />} />
+          <Route path="privacy" element={<SettingsPrivacyPage />} />
+        </Route>
         <Route path="/:username/affiliates" element={<AffiliatesPage />} />
         <Route path="/:username" element={<ProfilePage />} />
         <Route path="/:username/status/:postId" element={<PostPage />} />

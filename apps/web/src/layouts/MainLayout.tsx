@@ -1,4 +1,5 @@
-import { Outlet, NavLink, Link } from "react-router-dom";
+import { useEffect, useRef, useState } from "react";
+import { Outlet, NavLink, Link, useNavigate } from "react-router-dom";
 import {
   HomeIcon,
   ExploreIcon,
@@ -11,10 +12,9 @@ import {
   MoreIcon,
   SearchIcon,
   ComposeIcon,
-  SunIcon,
-  MoonIcon,
+  SettingsIcon,
 } from "../icons";
-import { useTheme } from "../theme";
+import { useSession } from "../hooks/useSession";
 
 const navItems = [
   { to: "/", label: "Home", icon: HomeIcon, end: true },
@@ -28,12 +28,31 @@ const navItems = [
 ];
 
 export function MainLayout() {
-  const { theme, toggle } = useTheme();
+  const [moreOpen, setMoreOpen] = useState(false);
+  const moreRef = useRef<HTMLLIElement>(null);
+  const navigate = useNavigate();
+  const { accounts, active, switchAccount, logout, isAuthenticated } = useSession();
+
+  useEffect(() => {
+    const onDoc = (e: MouseEvent) => {
+      if (moreRef.current && !moreRef.current.contains(e.target as Node)) {
+        setMoreOpen(false);
+      }
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setMoreOpen(false);
+    };
+    document.addEventListener("mousedown", onDoc);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDoc);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, []);
 
   return (
     <div className="min-h-screen flex justify-center">
       <div className="w-full max-w-[1290px] flex">
-        {/* Left rail — icons only from md, icons + labels from xl */}
         <div className="hidden md:flex flex-col items-end xl:items-stretch w-[88px] xl:w-[275px] shrink-0 px-1 xl:px-3 sticky top-0 h-screen">
           <nav className="flex flex-col h-full py-1" aria-label="Main">
             <Link
@@ -57,11 +76,134 @@ export function MainLayout() {
                   </NavLink>
                 </li>
               ))}
-              <li>
-                <button type="button" className="nav-item w-full">
+              <li className="relative" ref={moreRef}>
+                <button
+                  type="button"
+                  className="nav-item w-full"
+                  aria-haspopup="menu"
+                  aria-expanded={moreOpen}
+                  onClick={() => setMoreOpen((o) => !o)}
+                >
                   <MoreIcon className="w-[26.25px] h-[26.25px] shrink-0" />
                   <span className="hidden xl:inline pr-4">More</span>
                 </button>
+
+                {moreOpen ? (
+                  <div
+                    role="menu"
+                    className="absolute left-0 bottom-full mb-1 w-[280px] max-w-[calc(100vw-2rem)] rounded-2xl border shadow-xl z-50 overflow-hidden"
+                    style={{
+                      background: "var(--color-bg)",
+                      borderColor: "var(--color-border)",
+                      boxShadow: "0 0 15px rgba(0,0,0,0.2)",
+                    }}
+                  >
+                    <Link
+                      role="menuitem"
+                      to="/settings"
+                      className="flex items-center gap-3 px-4 py-3 hover:bg-[var(--color-bg-secondary)] text-[15px] font-bold"
+                      onClick={() => setMoreOpen(false)}
+                    >
+                      <SettingsIcon className="w-5 h-5" />
+                      Settings
+                    </Link>
+                    <Link
+                      role="menuitem"
+                      to="/settings/appearance"
+                      className="flex items-center gap-3 px-4 py-3 hover:bg-[var(--color-bg-secondary)] text-[15px]"
+                      onClick={() => setMoreOpen(false)}
+                    >
+                      Appearance
+                    </Link>
+                    <Link
+                      role="menuitem"
+                      to="/settings/account"
+                      className="flex items-center gap-3 px-4 py-3 hover:bg-[var(--color-bg-secondary)] text-[15px]"
+                      onClick={() => setMoreOpen(false)}
+                    >
+                      Account / switch
+                    </Link>
+
+                    {accounts.length > 0 ? (
+                      <>
+                        <div
+                          className="border-t px-4 py-2 text-[12px] font-bold uppercase tracking-wide"
+                          style={{
+                            borderColor: "var(--color-border)",
+                            color: "var(--color-text-secondary)",
+                          }}
+                        >
+                          Accounts
+                        </div>
+                        {accounts.map((a) => (
+                          <button
+                            key={a.userId}
+                            type="button"
+                            role="menuitem"
+                            className="flex items-center gap-3 w-full px-4 py-2.5 hover:bg-[var(--color-bg-secondary)] text-left"
+                            onClick={() => {
+                              switchAccount(a.userId);
+                              setMoreOpen(false);
+                            }}
+                          >
+                            <img
+                              src={a.avatarUrl || "/assets/default-avatar.svg"}
+                              alt=""
+                              className="w-8 h-8 rounded-full object-cover"
+                            />
+                            <span className="flex-1 min-w-0">
+                              <span className="block font-bold text-[14px] truncate">
+                                {a.displayName}
+                              </span>
+                              <span
+                                className="block text-[12px] truncate"
+                                style={{ color: "var(--color-text-secondary)" }}
+                              >
+                                @{a.username}
+                                {active?.userId === a.userId ? " · Active" : ""}
+                              </span>
+                            </span>
+                          </button>
+                        ))}
+                      </>
+                    ) : null}
+
+                    <div className="border-t" style={{ borderColor: "var(--color-border)" }}>
+                      {isAuthenticated ? (
+                        <button
+                          type="button"
+                          role="menuitem"
+                          className="w-full text-left px-4 py-3 hover:bg-[var(--color-bg-secondary)] text-[15px]"
+                          onClick={() => {
+                            logout();
+                            setMoreOpen(false);
+                            navigate("/login");
+                          }}
+                        >
+                          Log out
+                          {active ? ` @${active.username}` : ""}
+                        </button>
+                      ) : (
+                        <Link
+                          role="menuitem"
+                          to="/login"
+                          className="block px-4 py-3 hover:bg-[var(--color-bg-secondary)] text-[15px] font-bold"
+                          onClick={() => setMoreOpen(false)}
+                        >
+                          Sign in
+                        </Link>
+                      )}
+                      <Link
+                        role="menuitem"
+                        to="/login"
+                        className="block px-4 py-3 hover:bg-[var(--color-bg-secondary)] text-[15px]"
+                        onClick={() => setMoreOpen(false)}
+                      >
+                        Add an existing account
+                      </Link>
+                    </div>
+                  </div>
+                ) : null}
               </li>
             </ul>
 
@@ -74,27 +216,34 @@ export function MainLayout() {
               <ComposeIcon className="w-6 h-6 xl:hidden" />
             </button>
 
+            {/* Active account chip */}
             <div className="mt-auto mb-3 flex xl:justify-start justify-center">
-              <button
-                type="button"
-                onClick={toggle}
-                className="nav-item"
-                aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
-              >
-                {theme === "dark" ? (
-                  <SunIcon className="w-[26.25px] h-[26.25px] shrink-0" />
-                ) : (
-                  <MoonIcon className="w-[26.25px] h-[26.25px] shrink-0" />
-                )}
-                <span className="hidden xl:inline pr-4 text-[15px]">
-                  {theme === "dark" ? "Light mode" : "Dark mode"}
-                </span>
-              </button>
+              {active ? (
+                <button
+                  type="button"
+                  className="nav-item w-full max-w-full"
+                  onClick={() => setMoreOpen(true)}
+                  title="Switch account"
+                >
+                  <img
+                    src={active.avatarUrl || "/assets/default-avatar.svg"}
+                    alt=""
+                    className="w-[26.25px] h-[26.25px] rounded-full object-cover shrink-0"
+                  />
+                  <span className="hidden xl:inline pr-4 text-[15px] truncate">
+                    @{active.username}
+                  </span>
+                </button>
+              ) : (
+                <Link to="/login" className="nav-item">
+                  <ProfileIcon className="w-[26.25px] h-[26.25px] shrink-0" />
+                  <span className="hidden xl:inline pr-4 text-[15px]">Sign in</span>
+                </Link>
+              )}
             </div>
           </nav>
         </div>
 
-        {/* Timeline column */}
         <main
           className="flex-1 min-w-0 w-full max-w-[600px] border-x pb-16 md:pb-0"
           style={{ borderColor: "var(--color-border)" }}
@@ -102,7 +251,6 @@ export function MainLayout() {
           <Outlet />
         </main>
 
-        {/* Right sidebar */}
         <aside className="hidden lg:block w-[350px] shrink-0 px-8 py-1 sticky top-0 h-screen overflow-y-auto">
           <div className="sticky top-0 py-2 z-10" style={{ background: "var(--color-bg)" }}>
             <div className="relative">
@@ -141,6 +289,9 @@ export function MainLayout() {
             <Link to="/about" className="hover:underline">
               About
             </Link>
+            <Link to="/settings" className="hover:underline">
+              Settings
+            </Link>
             <a href="https://github.com/m4rcel-lol/horizon" className="hover:underline">
               Source
             </a>
@@ -149,13 +300,12 @@ export function MainLayout() {
         </aside>
       </div>
 
-      {/* Mobile bottom bar */}
       <nav
         className="md:hidden fixed bottom-0 inset-x-0 flex justify-around items-center h-[53px] border-t z-50"
         style={{ borderColor: "var(--color-border)", background: "var(--color-bg)" }}
         aria-label="Primary"
       >
-        {navItems.slice(0, 5).map(({ to, label, icon: Icon, end }) => (
+        {navItems.slice(0, 4).map(({ to, label, icon: Icon, end }) => (
           <NavLink
             key={to}
             to={to}
@@ -166,9 +316,11 @@ export function MainLayout() {
             <Icon className="w-[26px] h-[26px]" />
           </NavLink>
         ))}
+        <Link to="/settings" className="p-3 opacity-60" aria-label="Settings">
+          <SettingsIcon className="w-[26px] h-[26px]" />
+        </Link>
       </nav>
 
-      {/* Mobile compose button */}
       <button
         type="button"
         className="md:hidden fixed right-4 bottom-[69px] w-14 h-14 rounded-full btn btn-primary shadow-lg z-50"
