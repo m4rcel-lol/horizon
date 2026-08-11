@@ -153,6 +153,8 @@ export class InstanceSettingsService implements OnModuleInit {
       setupCompleted: this.get("setup.completed"),
       storageConfigured: this.getStorageConfig().configured,
       emailConfigured: this.getEmailConfig().configured,
+      maintenanceEnabled: Boolean(this.get("maintenance.enabled")),
+      maintenanceMessage: String(this.get("maintenance.message") ?? ""),
     };
   }
 

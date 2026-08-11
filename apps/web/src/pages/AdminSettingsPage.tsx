@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 /**
  * Admin → Instance settings (Storage + Email).
@@ -6,6 +6,7 @@ import { useState } from "react";
  * This UI is functional against the API once the operator is authenticated.
  */
 export function AdminSettingsPage() {
+  const [maintenance, setMaintenance] = useState({ enabled: false, message: "" });
   const [storage, setStorage] = useState({
     endpoint: "",
     region: "us-east-1",
@@ -27,6 +28,20 @@ export function AdminSettingsPage() {
   const [message, setMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
+  /**
+   * Load the stored settings on arrival.
+   *
+   * There was a Reload button but nothing ran on mount, so the form opened
+   * empty on every visit and Save wrote those blanks back — an operator who
+   * came here to change one thing silently cleared the storage endpoint,
+   * region, bucket and SMTP host. (Secrets survived, because save() skips
+   * empty ones; nothing else did.)
+   */
+  useEffect(() => {
+    void load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   async function load() {
     setLoading(true);
     setMessage(null);
@@ -42,6 +57,10 @@ export function AdminSettingsPage() {
           secretKey: "",
           forcePathStyle: Boolean(data.settings["storage.forcePathStyle"] ?? true),
           publicUrl: String(data.settings["storage.publicUrl"] ?? ""),
+        });
+        setMaintenance({
+          enabled: Boolean(data.settings["maintenance.enabled"]),
+          message: String(data.settings["maintenance.message"] ?? ""),
         });
         setEmail({
           enabled: Boolean(data.settings["email.enabled"]),
@@ -71,6 +90,8 @@ export function AdminSettingsPage() {
     setMessage(null);
     try {
       const body: Record<string, unknown> = {
+        "maintenance.enabled": maintenance.enabled,
+        "maintenance.message": maintenance.message,
         "storage.endpoint": storage.endpoint,
         "storage.region": storage.region,
         "storage.bucket": storage.bucket,
@@ -155,6 +176,29 @@ export function AdminSettingsPage() {
           {message}
         </p>
       )}
+
+      <section className="px-4 pb-8">
+        <h2 className="text-[20px] font-extrabold mb-1">Maintenance</h2>
+        <p className="text-[14px] mb-4" style={{ color: "var(--color-text-secondary)" }}>
+          Closes the instance to everyone without the system-management permission. Sign-in stays
+          open so you can get back in and turn this off, and you keep full access while it is on.
+        </p>
+        <label className="flex items-center gap-3 cursor-pointer mb-3">
+          <input
+            type="checkbox"
+            checked={maintenance.enabled}
+            onChange={(e) => setMaintenance({ ...maintenance, enabled: e.target.checked })}
+            className="accent-[var(--color-primary)] w-5 h-5"
+          />
+          <span className="font-bold text-[15px]">Enable maintenance mode</span>
+        </label>
+        <Field
+          label="Message shown to visitors"
+          value={maintenance.message}
+          onChange={(v) => setMaintenance({ ...maintenance, message: v })}
+          placeholder="Horizon is down for maintenance. We will be back shortly."
+        />
+      </section>
 
       <section className="px-4 pb-8">
         <h2 className="text-[20px] font-extrabold mb-4">Storage (S3-compatible)</h2>

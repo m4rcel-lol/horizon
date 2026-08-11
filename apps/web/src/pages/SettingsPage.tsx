@@ -6,7 +6,7 @@ import { useSession } from "../hooks/useSession";
 import { PERMISSIONS } from "@horizon/shared";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Avatar, NameWithBadges } from "../components/Verification";
-import { api } from "../api";
+import { api, ApiError } from "../api";
 
 const sections = [
   { to: "/settings/appearance", label: "Appearance", description: "Theme and display" },
@@ -175,6 +175,7 @@ export function SettingsAccountPage() {
   return (
     <div className="px-4 py-4">
       <h2 className="text-[20px] font-extrabold mb-1">Account</h2>
+      <ChangeUsername />
       <p className="text-[14px] mb-6" style={{ color: "var(--color-text-secondary)" }}>
         Accounts you have used on this device. You stay signed in after closing the browser unless you
         turn that off when signing in. Switching asks for that account&apos;s password, because a
@@ -594,6 +595,91 @@ function BlockedAccounts() {
           </li>
         ))}
       </ul>
+    </section>
+  );
+}
+
+/**
+ * Change your own handle.
+ *
+ * The server enforces the cooldown, the reserved list and uniqueness; this
+ * shows what it says rather than trying to predict any of it, so the two can
+ * never disagree about whether a name is available.
+ */
+function ChangeUsername() {
+  const { active, refresh } = useSession();
+  const queryClient = useQueryClient();
+  const [value, setValue] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [done, setDone] = useState<string | null>(null);
+
+  useEffect(() => setValue(active?.username ?? ""), [active?.username]);
+
+  const change = useMutation({
+    mutationFn: (next: string) => api.setUsername(active!.username, next),
+    onSuccess: async (data) => {
+      setError(null);
+      setDone(`You are now @${data.user.username}.`);
+      // Everything keyed by the old handle is stale, including the session.
+      queryClient.invalidateQueries();
+      await refresh();
+    },
+    onError: (e) => {
+      setDone(null);
+      setError(e instanceof ApiError ? e.message : "Could not change your handle.");
+    },
+  });
+
+  if (!active) return null;
+  const unchanged = value.trim() === active.username;
+
+  return (
+    <section className="mb-8 pb-8 border-b" style={{ borderColor: "var(--color-border)" }}>
+      <h3 className="text-[17px] font-bold mb-2">Username</h3>
+      <p className="text-[14px] mb-3" style={{ color: "var(--color-text-secondary)" }}>
+        Your handle is how people mention and find you. Changing it releases the old one for
+        someone else to take, and existing links to your old handle will stop working. You can
+        change it once every 14 days.
+      </p>
+      <form
+        className="flex flex-wrap gap-2 items-start"
+        onSubmit={(e) => {
+          e.preventDefault();
+          setError(null);
+          setDone(null);
+          change.mutate(value.trim());
+        }}
+      >
+        <div className="flex items-center gap-1 flex-1 min-w-[200px]">
+          <span className="text-[15px]" style={{ color: "var(--color-text-secondary)" }}>
+            @
+          </span>
+          <input
+            className="x-field flex-1"
+            value={value}
+            maxLength={20}
+            aria-label="New username"
+            onChange={(e) => setValue(e.target.value)}
+          />
+        </div>
+        <button
+          type="submit"
+          className="btn btn-primary"
+          disabled={change.isPending || unchanged || value.trim().length < 3}
+        >
+          {change.isPending ? "Saving…" : "Change"}
+        </button>
+      </form>
+      {error ? (
+        <p role="alert" className="mt-2 text-[14px]" style={{ color: "var(--color-danger)" }}>
+          {error}
+        </p>
+      ) : null}
+      {done ? (
+        <p role="status" className="mt-2 text-[14px]" style={{ color: "var(--color-success, #00ba7c)" }}>
+          {done}
+        </p>
+      ) : null}
     </section>
   );
 }

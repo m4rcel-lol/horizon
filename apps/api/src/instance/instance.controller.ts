@@ -5,7 +5,8 @@ import {
   EMAIL_SETTING_FIELDS,
 } from "@horizon/config";
 import { PERMISSIONS } from "@horizon/shared";
-import { Public, RequirePermissions } from "../auth/auth.decorators";
+import { CurrentUser, Public, RequirePermissions } from "../auth/auth.decorators";
+import type { AuthenticatedUser } from "../auth/authenticated-user";
 
 /**
  * Instance & admin settings API.
@@ -25,8 +26,13 @@ export class InstanceController {
 
   @Public()
   @Get()
-  getPublic() {
-    return this.settings.getPublicInfo();
+  getPublic(@CurrentUser() auth: AuthenticatedUser | null) {
+    const info = this.settings.getPublicInfo();
+    // Whether *this caller* is shut out, not merely whether the mode is on:
+    // an administrator is exempt server-side, so telling them the instance is
+    // closed would put a screen over a site that works for them.
+    const exempt = Boolean(auth?.permissions?.has(PERMISSIONS.SYSTEM_MANAGE));
+    return { ...info, maintenanceActive: info.maintenanceEnabled && !exempt };
   }
 
   @RequirePermissions(PERMISSIONS.SETTINGS_VIEW)

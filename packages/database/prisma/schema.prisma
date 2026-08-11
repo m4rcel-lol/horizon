@@ -59,6 +59,13 @@ model User {
   affiliatedToId    String?
   affiliatedAt      DateTime?
   status            AccountStatus  @default(ACTIVE)
+  /// Why the account is suspended, shown to them when they try to sign in.
+  suspensionReason  String?
+  /// When the suspension was applied, and who applied it.
+  suspendedAt       DateTime?
+  suspendedById     String?
+  /// Null on a permanent suspension. A past date lifts itself on next sign-in.
+  suspendedUntil    DateTime?
   // System accounts (e.g. @CommunityNotes) are seeded by the instance. They
   // cannot be signed into, edited, suspended or affiliated.
   isSystem          Boolean        @default(false)
@@ -100,6 +107,7 @@ model User {
   communityJoinRequests CommunityJoinRequest[]
   followRequestsSent     FollowRequest[] @relation("FollowRequester")
   followRequestsReceived FollowRequest[] @relation("FollowRequestTarget")
+  usernameHistory        UsernameChange[] @relation("UsernameChangeUser")
   reportsFiled      Report[]       @relation("Reporter")
   reportsAgainst    Report[]       @relation("ReportedUser")
   moderationActions ModerationAction[] @relation("ModerationTarget")
@@ -437,6 +445,27 @@ model FollowRequest {
 
   @@id([requesterId, targetId])
   @@index([targetId, createdAt(sort: Desc)])
+}
+
+/// Every handle an account has used.
+///
+/// Kept for moderation: a handle is the one piece of identity that can change,
+/// and without a record an account can rename away from its own history. Old
+/// handles are released rather than redirected, so this is an audit trail and
+/// not a routing table.
+model UsernameChange {
+  id        String   @id @default(cuid())
+  userId    String
+  fromUsername String
+  toUsername   String
+  /// Null when the account renamed itself; set when an administrator did.
+  actorId   String?
+  createdAt DateTime @default(now())
+
+  user User @relation("UsernameChangeUser", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([fromUsername])
 }
 
 model Block {

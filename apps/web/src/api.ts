@@ -232,6 +232,8 @@ export interface ApiUser {
   followersCount?: number;
   automatedBy?: { username: string; displayName: string } | null;
   automatedPending?: boolean;
+  /** Present only while suspended: why, since when, and until when. */
+  suspension?: { reason: string | null; until: string | null; since: string | null } | null;
   createdAt: string;
 }
 
@@ -245,20 +247,50 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * Subscribers notified when the instance says it is in maintenance.
+ *
+ * Every request can come back 503 MAINTENANCE_MODE, and the answer is the same
+ * wherever it happens — show the maintenance screen — so it is handled once
+ * here rather than in each of the forty call sites.
+ */
+type MaintenanceListener = (message: string | null) => void;
+const maintenanceListeners = new Set<MaintenanceListener>();
+
+export function onMaintenance(listener: MaintenanceListener) {
+  maintenanceListeners.add(listener);
+  return () => maintenanceListeners.delete(listener);
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`/api${path}`, {
-    credentials: "include",
-    headers: init?.body ? { "Content-Type": "application/json" } : undefined,
-    ...init,
-  });
+  let res: Response;
+  try {
+    res = await fetch(`/api${path}`, {
+      credentials: "include",
+      headers: init?.body ? { "Content-Type": "application/json" } : undefined,
+      ...init,
+    });
+  } catch {
+    // A dropped connection is not "request failed (undefined)" — it is the
+    // one error the reader can actually act on, by trying again.
+    throw new ApiError("NETWORK", "Could not reach the server. Check your connection.", 0);
+  }
+
   const data = await res.json().catch(() => ({}));
   if (!res.ok || data?.error) {
+    const code = data?.error?.code ?? "REQUEST_FAILED";
+    if (res.status === 503 && code === "MAINTENANCE_MODE") {
+      for (const listener of maintenanceListeners) listener(data?.error?.message ?? null);
+    }
+    // An administrator working during maintenance is exempt, so a request that
+    // succeeds means the mode is off (or does not apply) — clear the screen.
     throw new ApiError(
-      data?.error?.code ?? "REQUEST_FAILED",
+      code,
       data?.error?.message ?? `Request failed (${res.status})`,
       res.status,
     );
   }
+  for (const listener of maintenanceListeners) listener(null);
   return data as T;
 }
 
@@ -319,11 +351,24 @@ export const api = {
       method: "PATCH",
       body: JSON.stringify(body),
     }),
-  setUserStatus: (username: string, status: "ACTIVE" | "SUSPENDED") =>
+  setUserStatus: (
+    username: string,
+    status: "ACTIVE" | "SUSPENDED",
+    options: { reason?: string; durationMinutes?: number } = {},
+  ) =>
     request<{ user: ApiUser }>(`/users/${encodeURIComponent(username)}/status`, {
       method: "PATCH",
-      body: JSON.stringify({ status }),
+      body: JSON.stringify({ status, ...options }),
     }),
+  setUsername: (username: string, next: string) =>
+    request<{ user: ApiUser }>(`/users/${encodeURIComponent(username)}/username`, {
+      method: "PATCH",
+      body: JSON.stringify({ username: next }),
+    }),
+  usernameHistory: (username: string) =>
+    request<{
+      history: { id: string; from: string; to: string; byAdmin: boolean; createdAt: string }[];
+    }>(`/users/${encodeURIComponent(username)}/username/history`),
   setVerification: (username: string, type: VerificationType, reason?: string) =>
     request<{ user: ApiUser; releasedAffiliates: number }>(
       `/users/${encodeURIComponent(username)}/verification`,
@@ -456,6 +501,16 @@ export const api = {
     }),
 
   // Statistics
+  /** Public instance info. Stays reachable during maintenance, by design. */
+  instanceInfo: () =>
+    request<{
+      name: string;
+      description: string;
+      registrationEnabled: boolean;
+      /** True only when the *caller* is shut out — administrators are exempt. */
+      maintenanceActive: boolean;
+      maintenanceMessage: string;
+    }>("/instance"),
   instanceStats: () => request<{ stats: InstanceStats }>("/stats/instance"),
   userStats: (username: string) =>
     request<{ stats: UserStats }>(`/stats/user/${encodeURIComponent(username)}`),
