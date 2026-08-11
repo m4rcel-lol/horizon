@@ -31,12 +31,28 @@ export function CommunityNoteCard({
       className="rounded-2xl border p-4"
       style={{ borderColor: "var(--color-border-strong)", background: "var(--color-bg-secondary)" }}
     >
+      {/*
+        A note that readers have accepted and one still gathering ratings are
+        different claims, so they do not get the same heading. Saying "readers
+        added context" about something nobody has agreed with yet would put
+        words in their mouths.
+      */}
       <header className="flex items-center gap-2 flex-wrap">
-        <span className="font-bold text-[15px]">Readers added context</span>
+        <span className="font-bold text-[15px]">
+          {note.status === "HELPFUL" ? "Readers added context" : "A reader proposed context"}
+        </span>
         <span className="text-[13px]" style={{ color: "var(--color-text-secondary)" }}>
           · {note.classificationLabel}
         </span>
       </header>
+
+      {note.status !== "HELPFUL" ? (
+        <p className="mt-1 text-[13px]" style={{ color: "var(--color-text-secondary)" }}>
+          Not shown on the timeline yet — it needs{" "}
+          <strong style={{ color: "var(--color-text)" }}>{note.ratingsNeeded}</strong> more{" "}
+          {note.ratingsNeeded === 1 ? "rating" : "ratings"} before readers decide.
+        </p>
+      ) : null}
 
       <p className="mt-2 text-[15px] leading-5">{note.body}</p>
 
@@ -70,12 +86,26 @@ export function CommunityNoteCard({
       {onRate ? (
         <div className="mt-3 flex items-center gap-2 flex-wrap">
           <span className="text-[14px]" style={{ color: "var(--color-text-secondary)" }}>
-            Do you find this helpful?
+            {note.viewerRating === null ? "Do you find this helpful?" : "You rated this"}
           </span>
-          <button type="button" className="btn btn-outline" disabled={rating} onClick={() => onRate(true)}>
+          {/* The caller's own vote is filled in, so it is clear it registered
+              and which way — and it can still be changed. */}
+          <button
+            type="button"
+            className={`btn ${note.viewerRating === true ? "btn-primary" : "btn-outline"}`}
+            aria-pressed={note.viewerRating === true}
+            disabled={rating}
+            onClick={() => onRate(true)}
+          >
             Yes
           </button>
-          <button type="button" className="btn btn-outline" disabled={rating} onClick={() => onRate(false)}>
+          <button
+            type="button"
+            className={`btn ${note.viewerRating === false ? "btn-primary" : "btn-outline"}`}
+            aria-pressed={note.viewerRating === false}
+            disabled={rating}
+            onClick={() => onRate(false)}
+          >
             No
           </button>
         </div>
