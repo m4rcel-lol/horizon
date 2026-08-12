@@ -185,6 +185,31 @@ export interface ApiNotification {
   createdAt: string;
 }
 
+export type DmPermission = "everyone" | "mutuals" | "following" | "none";
+
+export interface ApiConversation {
+  id: string;
+  isGroup: boolean;
+  title: string | null;
+  /** Everyone but you — what a list row is named after. */
+  others: ApiUser[];
+  lastMessage: { content: string; createdAt: string; senderId: string } | null;
+  lastMessageAt: string | null;
+  unreadCount: number;
+  memberCount: number;
+}
+
+export interface ApiMessage {
+  id: string;
+  conversationId: string;
+  sender: ApiUser | null;
+  senderId: string;
+  content: string;
+  createdAt: string;
+  deleted: boolean;
+  mine: boolean;
+}
+
 export interface Relationship {
   following: boolean;
   followsYou: boolean;
@@ -511,6 +536,41 @@ export const api = {
       maintenanceActive: boolean;
       maintenanceMessage: string;
     }>("/instance"),
+  // Messages
+  conversations: () => request<{ conversations: ApiConversation[] }>("/messages"),
+  conversation: (id: string) =>
+    request<{ conversation: ApiConversation }>(`/messages/${encodeURIComponent(id)}`),
+  messages: (id: string) =>
+    request<{ messages: ApiMessage[] }>(`/messages/${encodeURIComponent(id)}/messages`),
+  sendMessage: (id: string, content: string) =>
+    request<{ message: ApiMessage }>(`/messages/${encodeURIComponent(id)}/messages`, {
+      method: "POST",
+      body: JSON.stringify({ content }),
+    }),
+  createConversation: (usernames: string[], title?: string) =>
+    request<{ conversation: ApiConversation }>("/messages", {
+      method: "POST",
+      body: JSON.stringify({ usernames, ...(title ? { title } : {}) }),
+    }),
+  markConversationRead: (id: string) =>
+    request<{ ok: true }>(`/messages/${encodeURIComponent(id)}/read`, { method: "POST" }),
+  leaveConversation: (id: string) =>
+    request<{ ok: true }>(`/messages/${encodeURIComponent(id)}/membership`, { method: "DELETE" }),
+  deleteMessage: (messageId: string) =>
+    request<{ ok: true }>(`/messages/message/${encodeURIComponent(messageId)}`, {
+      method: "DELETE",
+    }),
+  unreadMessages: () => request<{ count: number }>("/messages/unread-count"),
+  dmSettings: () => request<{ dmPermission: DmPermission }>("/messages/settings"),
+  setDmSettings: (dmPermission: DmPermission) =>
+    request<{ dmPermission: DmPermission }>("/messages/settings", {
+      method: "PUT",
+      body: JSON.stringify({ dmPermission }),
+    }),
+  canMessage: (username: string) =>
+    request<{ allowed: boolean; reason: string | null }>(
+      `/messages/can-message/${encodeURIComponent(username)}`,
+    ),
   instanceStats: () => request<{ stats: InstanceStats }>("/stats/instance"),
   userStats: (username: string) =>
     request<{ stats: UserStats }>(`/stats/user/${encodeURIComponent(username)}`),

@@ -6,7 +6,7 @@ import { LandingPage } from "./pages/LandingPage";
 import { HomePage } from "./pages/HomePage";
 import { ExplorePage } from "./pages/ExplorePage";
 import { NotificationsPage } from "./pages/NotificationsPage";
-import { MessagesPage } from "./pages/MessagesPage";
+import { MessagesPage, ConversationPage } from "./pages/MessagesPage";
 import { BookmarksPage } from "./pages/BookmarksPage";
 import { ListsPage } from "./pages/ListsPage";
 import { CommunitiesPage } from "./pages/CommunitiesPage";
@@ -144,6 +144,7 @@ export default function App() {
           <Route path="privacy" element={<SettingsPrivacyPage />} />
           <Route path="automation" element={<SettingsAutomationPage />} />
         </Route>
+        <Route path="/messages/:id" element={<ConversationPage />} />
         <Route path="/communities/:slug" element={<CommunityPage />} />
         <Route path="/communities/:slug/requests" element={<CommunityJoinRequestsPage />} />
         <Route path="/:username/affiliates" element={<AffiliatesPage />} />

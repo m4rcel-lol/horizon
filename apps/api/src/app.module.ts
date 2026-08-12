@@ -13,6 +13,7 @@ import { MediaModule } from "./media/media.module";
 import { SocialModule } from "./social/social.module";
 import { CommunitiesModule } from "./communities/communities.module";
 import { StatsModule } from "./stats/stats.module";
+import { MessagingModule } from "./messaging/messaging.module";
 import { SessionGuard } from "./auth/session.guard";
 import { PermissionsGuard } from "./auth/permissions.guard";
 import { MaintenanceGuard } from "./instance/maintenance.guard";
@@ -38,6 +39,7 @@ import { MaintenanceGuard } from "./instance/maintenance.guard";
     SocialModule,
     CommunitiesModule,
     StatsModule,
+    MessagingModule,
   ],
   // Guards run in the order they are declared. Rate limiting comes first so a
   // flood is cheap to reject; SessionGuard then resolves the caller and closes
