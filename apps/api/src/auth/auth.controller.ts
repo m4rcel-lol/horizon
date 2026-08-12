@@ -8,6 +8,7 @@ import { CurrentUser, Public } from "./auth.decorators";
 import type { AuthenticatedUser } from "./authenticated-user";
 import { PERMISSIONS } from "@horizon/shared";
 import { InstanceSettingsService } from "../instance/instance-settings.service";
+import { DelegationService } from "../users/delegation.service";
 
 class RegisterDto {
   @IsString()
@@ -51,6 +52,7 @@ export class AuthController {
     private readonly auth: AuthService,
     private readonly directory: UserDirectoryService,
     private readonly settings: InstanceSettingsService,
+    private readonly delegation: DelegationService,
   ) {}
 
   /**
@@ -164,6 +166,40 @@ export class AuthController {
       return {
         user: await this.directory.get(resolved.user.username),
       };
+    });
+  }
+
+  /**
+   * Switch into an account you have been delegated.
+   *
+   * A real session for the other account, opened by you: no password changes
+   * hands, the delegation can be revoked at any moment, and the session records
+   * who opened it so a delegated action is attributable to a person.
+   */
+  @Post("act-as")
+  async actAs(
+    @Body() body: { username?: string },
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+    @CurrentUser() auth: AuthenticatedUser,
+  ) {
+    return this.unwrap(async () => {
+      const username = body.username?.trim();
+      if (!username) throw new DirectoryError("INVALID", "Which account?", 400);
+      const owner = await this.directory.get(username);
+      if (!(await this.delegation.isDelegate(auth.id, owner.id))) {
+        throw new DirectoryError("NOT_A_DELEGATE", `You cannot act for @${owner.username}.`, 403);
+      }
+      if (owner.status === "SUSPENDED") {
+        throw new DirectoryError("ACCOUNT_SUSPENDED", "That account is suspended.", 403);
+      }
+      await this.assertMayEnterDuringMaintenance(owner.id);
+      const { token, expiresAt } = await this.auth.createSession(owner.id, {
+        ...this.clientMeta(req),
+        delegatedById: auth.id,
+      });
+      this.setSessionCookie(res, token, true);
+      return { user: owner, sessionToken: token, expiresAt: expiresAt.toISOString() };
     });
   }
 

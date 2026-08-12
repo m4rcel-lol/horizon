@@ -12,6 +12,12 @@ const cards = [
     permission: PERMISSIONS.USERS_VIEW,
   },
   {
+    to: "/admin/posts",
+    title: "Posts",
+    body: "Find any post by text or author, and remove one with a recorded reason.",
+    permission: PERMISSIONS.POSTS_VIEW,
+  },
+  {
     to: "/admin/statistics",
     title: "Statistics",
     body: "Accounts, posts, engagement and Community Notes across the whole instance.",

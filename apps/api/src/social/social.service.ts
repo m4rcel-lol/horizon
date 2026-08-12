@@ -322,6 +322,23 @@ export class SocialService {
   }
 
   /**
+   * Suspended accounts, whose posts leave every timeline entirely.
+   *
+   * Separate from hiddenAuthorIds because the rule is different in both
+   * directions: a suspension applies to every reader rather than depending on
+   * who is looking, and it takes the account's replies with it. A profile that
+   * says "suspended" while the account's posts keep circulating would not be a
+   * suspension.
+   */
+  async suspendedAuthorIds(): Promise<string[]> {
+    const rows = await this.prisma.user.findMany({
+      where: { status: "SUSPENDED" },
+      select: { id: true },
+    });
+    return rows.map((r) => r.id);
+  }
+
+  /**
    * Accounts whose top-level posts this viewer must not be shown: private
    * accounts they do not follow.
    *

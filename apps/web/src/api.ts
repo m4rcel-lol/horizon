@@ -168,7 +168,10 @@ export type ApiNotificationDetail =
   | "JOIN_APPROVED"
   | "AUTOMATION_REQUEST"
   | "AUTOMATION_ACCEPTED"
-  | "AUTOMATION_DECLINED";
+  | "AUTOMATION_DECLINED"
+  | "DELEGATION_REQUEST"
+  | "DELEGATION_ACCEPTED"
+  | "DELEGATION_DECLINED";
 
 export interface ApiNotification {
   id: string;
@@ -208,6 +211,31 @@ export interface ApiMessage {
   createdAt: string;
   deleted: boolean;
   mine: boolean;
+}
+
+export interface ApiDelegation {
+  id: string;
+  status: "pending" | "accepted";
+  owner: ApiUser | null;
+  delegate: ApiUser | null;
+  createdAt: string;
+  acceptedAt: string | null;
+}
+
+export interface AdminPost {
+  id: string;
+  content: string;
+  createdAt: string;
+  deleted: boolean;
+  likeCount: number;
+  replyCount: number;
+  repostCount: number;
+  author: {
+    username: string;
+    displayName: string;
+    avatarUrl: string | null;
+    suspended: boolean;
+  };
 }
 
 export interface Relationship {
@@ -419,6 +447,38 @@ export const api = {
       method: "PUT",
       body: JSON.stringify({ on }),
     }),
+  // Delegation
+  delegationsGranted: () => request<{ delegations: ApiDelegation[] }>("/users/delegations/granted"),
+  delegationsReceived: () => request<{ delegations: ApiDelegation[] }>("/users/delegations/received"),
+  inviteDelegate: (username: string) =>
+    request<{ delegation: ApiDelegation }>("/users/delegations", {
+      method: "POST",
+      body: JSON.stringify({ username }),
+    }),
+  respondToDelegation: (owner: string, approve: boolean) =>
+    request<{ ok: true; accepted: boolean }>(
+      `/users/delegations/${encodeURIComponent(owner)}/respond`,
+      { method: "POST", body: JSON.stringify({ approve }) },
+    ),
+  revokeDelegation: (owner: string, delegate: string) =>
+    request<{ ok: true }>(
+      `/users/delegations/${encodeURIComponent(owner)}/${encodeURIComponent(delegate)}`,
+      { method: "DELETE" },
+    ),
+  actAs: (username: string) =>
+    request<{ user: ApiUser; sessionToken: string; expiresAt: string }>("/auth/act-as", {
+      method: "POST",
+      body: JSON.stringify({ username }),
+    }),
+  adminSearchPosts: (params: { q?: string; author?: string; page?: number }) => {
+    const qs = new URLSearchParams();
+    if (params.q) qs.set("q", params.q);
+    if (params.author) qs.set("author", params.author);
+    if (params.page) qs.set("page", String(params.page));
+    return request<{ posts: AdminPost[]; total: number; page: number; perPage: number }>(
+      `/posts/moderation/search?${qs.toString()}`,
+    );
+  },
   adminSearchUsers: (params: {
     q?: string;
     status?: "ALL" | "ACTIVE" | "SUSPENDED";
@@ -623,8 +683,11 @@ export const api = {
     }),
   followingTimeline: () => request<{ posts: ApiPost[] }>("/posts/following"),
   replies: (id: string) => request<{ posts: ApiPost[] }>(`/posts/${encodeURIComponent(id)}/replies`),
-  deletePost: (id: string) =>
-    request<{ deleted: boolean }>(`/posts/${encodeURIComponent(id)}`, { method: "DELETE" }),
+  deletePost: (id: string, reason?: string) =>
+    request<{ deleted: boolean }>(
+      `/posts/${encodeURIComponent(id)}${reason ? `?reason=${encodeURIComponent(reason)}` : ""}`,
+      { method: "DELETE" },
+    ),
   // PUT the state you want: a double tap cannot leave the count drifting.
   setLike: (id: string, on: boolean) =>
     request<{ post: ApiPost }>(`/posts/${encodeURIComponent(id)}/like`, {

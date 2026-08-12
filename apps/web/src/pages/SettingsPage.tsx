@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
+import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { ArrowLeftIcon } from "../icons";
 import { useTheme } from "../theme";
 import { useSession } from "../hooks/useSession";
@@ -13,6 +13,7 @@ const sections = [
   { to: "/settings/account", label: "Account", description: "Sessions and account switching" },
   { to: "/settings/privacy", label: "Privacy", description: "Visibility and interactions" },
   { to: "/settings/automation", label: "Automation", description: "Automated account management" },
+  { to: "/settings/delegation", label: "Delegation", description: "Let someone post as this account" },
 ];
 
 /** Shown only to accounts that hold the matching permission. */
@@ -697,5 +698,236 @@ function ChangeUsername() {
         </p>
       ) : null}
     </section>
+  );
+}
+
+/**
+ * Account delegation.
+ *
+ * Two lists, because the relationship has two ends and someone is usually on
+ * both: people who may act for this account, and accounts this one may act
+ * for. Either side can end a delegation, so both lists carry the control.
+ */
+export function SettingsDelegationPage() {
+  const { active, refresh } = useSession();
+  const queryClient = useQueryClient();
+  const navigate = useNavigate();
+  const [handle, setHandle] = useState("");
+  const [error, setError] = useState<string | null>(null);
+
+  const granted = useQuery({
+    queryKey: ["delegations-granted"],
+    queryFn: api.delegationsGranted,
+    enabled: Boolean(active),
+    retry: false,
+  });
+  const received = useQuery({
+    queryKey: ["delegations-received"],
+    queryFn: api.delegationsReceived,
+    enabled: Boolean(active),
+    retry: false,
+  });
+
+  const refreshBoth = () => {
+    queryClient.invalidateQueries({ queryKey: ["delegations-granted"] });
+    queryClient.invalidateQueries({ queryKey: ["delegations-received"] });
+  };
+  const onError = (e: unknown) =>
+    setError(e instanceof ApiError ? e.message : "That did not work.");
+
+  const invite = useMutation({
+    mutationFn: (username: string) => api.inviteDelegate(username),
+    onSuccess: () => {
+      setHandle("");
+      setError(null);
+      refreshBoth();
+    },
+    onError,
+  });
+  const respond = useMutation({
+    mutationFn: ({ owner, approve }: { owner: string; approve: boolean }) =>
+      api.respondToDelegation(owner, approve),
+    onSuccess: refreshBoth,
+    onError,
+  });
+  const revoke = useMutation({
+    mutationFn: ({ owner, delegate }: { owner: string; delegate: string }) =>
+      api.revokeDelegation(owner, delegate),
+    onSuccess: refreshBoth,
+    onError,
+  });
+  const act = useMutation({
+    mutationFn: (username: string) => api.actAs(username),
+    onSuccess: async ({ user }) => {
+      queryClient.invalidateQueries();
+      await refresh();
+      navigate(`/${user.username}`);
+    },
+    onError,
+  });
+
+  const grantedRows = granted.data?.delegations ?? [];
+  const receivedRows = received.data?.delegations ?? [];
+
+  return (
+    <div className="px-4 py-4">
+      <h2 className="text-[20px] font-extrabold mb-1">Delegation</h2>
+      <p className="text-[14px] mb-6" style={{ color: "var(--color-text-secondary)" }}>
+        Let someone post as this account without giving them the password. They switch into it from
+        their own account, either of you can end it at any time, and every delegated session records
+        who opened it.
+      </p>
+
+      {error ? (
+        <p role="alert" className="mb-3 text-[14px]" style={{ color: "var(--color-danger)" }}>
+          {error}
+        </p>
+      ) : null}
+
+      <section className="mb-8">
+        <h3 className="text-[17px] font-bold mb-2">People who can post as you</h3>
+        <form
+          className="flex gap-2 mb-3"
+          onSubmit={(e) => {
+            e.preventDefault();
+            setError(null);
+            invite.mutate(handle.trim().replace(/^@/, ""));
+          }}
+        >
+          <input
+            className="x-field flex-1"
+            placeholder="@username"
+            value={handle}
+            onChange={(e) => setHandle(e.target.value)}
+            aria-label="Delegate username"
+          />
+          <button
+            type="submit"
+            className="btn btn-primary"
+            disabled={invite.isPending || handle.trim().length < 2}
+          >
+            Invite
+          </button>
+        </form>
+
+        {grantedRows.length === 0 ? (
+          <p className="text-[14px]" style={{ color: "var(--color-text-secondary)" }}>
+            Nobody else can post as you.
+          </p>
+        ) : (
+          <ul className="flex flex-col gap-2">
+            {grantedRows.map((d) => (
+              <li
+                key={d.id}
+                className="flex items-center gap-3 rounded-2xl border p-3"
+                style={{ borderColor: "var(--color-border)" }}
+              >
+                <Avatar
+                  shape={d.delegate?.avatarShape ?? "circle"}
+                  size={40}
+                  src={d.delegate?.avatarUrl || "/assets/default-avatar.svg"}
+                />
+                <div className="min-w-0 flex-1">
+                  <span className="font-bold block truncate">{d.delegate?.displayName}</span>
+                  <span className="text-[14px]" style={{ color: "var(--color-text-secondary)" }}>
+                    @{d.delegate?.username} · {d.status === "accepted" ? "Active" : "Invited"}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  className="btn btn-outline shrink-0"
+                  disabled={revoke.isPending}
+                  onClick={() =>
+                    revoke.mutate({
+                      owner: active!.username,
+                      delegate: d.delegate!.username,
+                    })
+                  }
+                >
+                  {d.status === "accepted" ? "Remove" : "Cancel"}
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      <section>
+        <h3 className="text-[17px] font-bold mb-2">Accounts you can post as</h3>
+        {receivedRows.length === 0 ? (
+          <p className="text-[14px]" style={{ color: "var(--color-text-secondary)" }}>
+            No accounts have delegated to you.
+          </p>
+        ) : (
+          <ul className="flex flex-col gap-2">
+            {receivedRows.map((d) => (
+              <li
+                key={d.id}
+                className="flex items-center gap-3 rounded-2xl border p-3"
+                style={{ borderColor: "var(--color-border)" }}
+              >
+                <Avatar
+                  shape={d.owner?.avatarShape ?? "circle"}
+                  size={40}
+                  src={d.owner?.avatarUrl || "/assets/default-avatar.svg"}
+                />
+                <div className="min-w-0 flex-1">
+                  <span className="font-bold block truncate">{d.owner?.displayName}</span>
+                  <span className="text-[14px]" style={{ color: "var(--color-text-secondary)" }}>
+                    @{d.owner?.username}
+                  </span>
+                </div>
+                <div className="flex gap-2 shrink-0">
+                  {d.status === "pending" ? (
+                    <>
+                      <button
+                        type="button"
+                        className="btn btn-outline"
+                        disabled={respond.isPending}
+                        onClick={() => respond.mutate({ owner: d.owner!.username, approve: false })}
+                      >
+                        Decline
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-primary"
+                        disabled={respond.isPending}
+                        onClick={() => respond.mutate({ owner: d.owner!.username, approve: true })}
+                      >
+                        Accept
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <button
+                        type="button"
+                        className="btn btn-outline"
+                        disabled={revoke.isPending}
+                        onClick={() =>
+                          revoke.mutate({
+                            owner: d.owner!.username,
+                            delegate: active!.username,
+                          })
+                        }
+                      >
+                        Resign
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-primary"
+                        disabled={act.isPending}
+                        onClick={() => act.mutate(d.owner!.username)}
+                      >
+                        Post as them
+                      </button>
+                    </>
+                  )}
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+    </div>
   );
 }

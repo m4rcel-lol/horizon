@@ -28,7 +28,9 @@ import { RequirePermission } from "./components/RequirePermission";
 import { AdminLayout } from "./layouts/AdminLayout";
 import { AdminOverviewPage } from "./pages/AdminOverviewPage";
 import { AdminUsersPage } from "./pages/AdminUsersPage";
+import { AdminPostsPage } from "./pages/AdminPostsPage";
 import { MaintenanceScreen } from "./components/MaintenanceScreen";
+import { NewsPage } from "./pages/NewsPage";
 import { AdminStatisticsPage } from "./pages/AdminStatisticsPage";
 import { AdminNotesPage } from "./pages/AdminNotesPage";
 import { UserStatsPage } from "./pages/UserStatsPage";
@@ -42,6 +44,7 @@ import {
   SettingsAccountPage,
   SettingsPrivacyPage,
   SettingsAutomationPage,
+  SettingsDelegationPage,
 } from "./pages/SettingsPage";
 
 /**
@@ -78,6 +81,14 @@ export default function App() {
           element={
             <RequirePermission permission={PERMISSIONS.USERS_VIEW}>
               <AdminUsersPage />
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="posts"
+          element={
+            <RequirePermission permission={PERMISSIONS.POSTS_VIEW}>
+              <AdminPostsPage />
             </RequirePermission>
           }
         />
@@ -143,8 +154,10 @@ export default function App() {
           <Route path="account" element={<SettingsAccountPage />} />
           <Route path="privacy" element={<SettingsPrivacyPage />} />
           <Route path="automation" element={<SettingsAutomationPage />} />
+          <Route path="delegation" element={<SettingsDelegationPage />} />
         </Route>
         <Route path="/messages/:id" element={<ConversationPage />} />
+        <Route path="/news" element={<NewsPage />} />
         <Route path="/communities/:slug" element={<CommunityPage />} />
         <Route path="/communities/:slug/requests" element={<CommunityJoinRequestsPage />} />
         <Route path="/:username/affiliates" element={<AffiliatesPage />} />

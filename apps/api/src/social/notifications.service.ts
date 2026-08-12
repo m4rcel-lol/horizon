@@ -36,7 +36,10 @@ export type NotificationDetail =
   | "JOIN_APPROVED"
   | "AUTOMATION_REQUEST"
   | "AUTOMATION_ACCEPTED"
-  | "AUTOMATION_DECLINED";
+  | "AUTOMATION_DECLINED"
+  | "DELEGATION_REQUEST"
+  | "DELEGATION_ACCEPTED"
+  | "DELEGATION_DECLINED";
 
 export interface PresentedNotification {
   id: string;
@@ -215,7 +218,9 @@ export class NotificationsService {
       } else if (kind === "JOIN_APPROVED" && community) {
         href = `/communities/${community.slug}`;
       } else if (kind?.startsWith("AUTOMATION_")) {
-        href = "/settings";
+        href = "/settings/automation";
+      } else if (kind?.startsWith("DELEGATION_")) {
+        href = "/settings/delegation";
       }
 
       return {

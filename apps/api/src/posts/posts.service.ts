@@ -239,6 +239,9 @@ export class PostsService {
         ? { id: replyParent.id, authorUsername: replyParent.author.username }
         : null,
       bookmarkedByViewer: Boolean(bookmarked),
+      // Whether *this* reader may delete it. A moderator can delete anything,
+      // but does so from the admin panel, which is where the reason that has
+      // to accompany it belongs — so this stays about the author.
       deletableByViewer: viewerId === post.authorId,
       media: await this.mediaService.describe(post.media.map((m) => m.mediaId)),
       poll: post.poll ? await this.presentPoll(post.poll, viewerId) : null,
@@ -419,17 +422,27 @@ export class PostsService {
    * readable, so a thread does not turn into holes for everyone else in it.
    * Written once here because four separate read paths need exactly this.
    */
-  private audienceFilter(hidden: string[]) {
-    if (hidden.length === 0) return {};
-    return { NOT: { AND: [{ authorId: { in: hidden } }, { replyToId: null }] } };
+  private audienceFilter(hidden: string[], suspended: string[] = []) {
+    const clauses: object[] = [];
+    if (hidden.length) {
+      clauses.push({ NOT: { AND: [{ authorId: { in: hidden } }, { replyToId: null }] } });
+    }
+    // A suspension takes everything with it, replies included, for every
+    // reader — otherwise a profile reading "suspended" sits above posts by
+    // that account still circulating everywhere else.
+    if (suspended.length) clauses.push({ authorId: { notIn: suspended } });
+    return clauses.length ? { AND: clauses } : {};
   }
 
   /** Posts by id, in the order given — used by bookmarks, search and communities. */
   async byIds(ids: string[], viewerId: string | null = null): Promise<PresentedPost[]> {
     if (ids.length === 0) return [];
-    const hidden = await this.social.hiddenAuthorIds(viewerId);
+    const [hidden, suspended] = await Promise.all([
+      this.social.hiddenAuthorIds(viewerId),
+      this.social.suspendedAuthorIds(),
+    ]);
     const posts = (await this.prisma.post.findMany({
-      where: { id: { in: ids }, deletedAt: null, ...this.audienceFilter(hidden) },
+      where: { id: { in: ids }, deletedAt: null, ...this.audienceFilter(hidden, suspended) },
       select: POST_SELECT,
     })) as PostRow[];
     const byId = new Map(posts.map((p) => [p.id, p]));
@@ -444,9 +457,20 @@ export class PostsService {
    * silently omits you reads as though your post failed to send.
    */
   async following(viewerId: string): Promise<PresentedPost[]> {
-    const ids = await this.social.followingIds(viewerId);
+    const [ids, suspended] = await Promise.all([
+      this.social.followingIds(viewerId),
+      this.social.suspendedAuthorIds(),
+    ]);
+    // Following someone who is later suspended should not keep them in the
+    // feed; the follow survives the suspension, the posts do not.
+    const banned = new Set(suspended);
+    const visible = [...ids, viewerId].filter((id) => !banned.has(id));
     const posts = (await this.prisma.post.findMany({
-      where: { deletedAt: null, replyToId: null, authorId: { in: [...ids, viewerId] } },
+      where: {
+        deletedAt: null,
+        replyToId: null,
+        authorId: { in: visible },
+      },
       orderBy: { createdAt: "desc" },
       take: 100,
       select: POST_SELECT,
@@ -504,13 +528,89 @@ export class PostsService {
    * The row stays so replies quoting or answering it do not lose their parent
    * key; every read filters on deletedAt.
    */
-  async remove(id: string, viewerId: string, canModerate: boolean) {
+  async remove(id: string, viewerId: string, canModerate: boolean, reason?: string) {
     const post = await this.requirePost(id);
-    if (post.authorId !== viewerId && !canModerate) {
+    const isOwn = post.authorId === viewerId;
+    if (!isOwn && !canModerate) {
       throw new DirectoryError("NOT_YOUR_POST", "You can only delete your own posts.", 403);
     }
-    await this.prisma.post.update({ where: { id }, data: { deletedAt: new Date() } });
+    await this.prisma.$transaction(async (tx) => {
+      await tx.post.update({ where: { id }, data: { deletedAt: new Date() } });
+      // Someone deleting their own post is not moderation and needs no record.
+      // A moderator reaching into another account's posts is, and the instance
+      // should be able to say afterwards who removed what and why.
+      if (!isOwn) {
+        await tx.moderationAction.create({
+          data: {
+            targetUserId: post.authorId,
+            targetPostId: id,
+            actorId: viewerId,
+            action: "delete_post",
+            reason: reason?.trim() || null,
+          },
+        });
+      }
+    });
     return { deleted: true };
+  }
+
+  /**
+   * Posts as a moderator needs to find them: by text, by author, newest first.
+   *
+   * Deleted posts are included and flagged, because "did someone already remove
+   * this" is exactly the question being asked when a report comes in twice.
+   */
+  async moderationSearch(input: { query?: string; author?: string; page?: number }) {
+    const perPage = 25;
+    const page = Math.max(input.page ?? 1, 1);
+    const query = (input.query ?? "").trim();
+    const author = (input.author ?? "").trim();
+
+    const where = {
+      ...(query ? { content: { contains: query, mode: "insensitive" as const } } : {}),
+      ...(author ? { author: { username: author } } : {}),
+    };
+
+    const [rows, total] = await Promise.all([
+      this.prisma.post.findMany({
+        where,
+        orderBy: { createdAt: "desc" },
+        skip: (page - 1) * perPage,
+        take: perPage,
+        select: {
+          id: true,
+          content: true,
+          createdAt: true,
+          deletedAt: true,
+          likeCount: true,
+          replyCount: true,
+          repostCount: true,
+          author: { select: { username: true, displayName: true, avatarUrl: true, status: true } },
+        },
+      }),
+      this.prisma.post.count({ where }),
+    ]);
+
+    return {
+      posts: rows.map((r) => ({
+        id: r.id,
+        content: r.content,
+        createdAt: r.createdAt.toISOString(),
+        deleted: r.deletedAt !== null,
+        likeCount: r.likeCount,
+        replyCount: r.replyCount,
+        repostCount: r.repostCount,
+        author: {
+          username: r.author.username,
+          displayName: r.author.displayName,
+          avatarUrl: r.author.avatarUrl,
+          suspended: r.author.status === "SUSPENDED",
+        },
+      })),
+      total,
+      page,
+      perPage,
+    };
   }
 
   /**
@@ -524,14 +624,18 @@ export class PostsService {
     // Private accounts keep their timeline to approved followers. This is the
     // listing both the public feed and a profile page come through, so the
     // filter belongs here rather than at either call site.
-    const hidden = await this.social.hiddenAuthorIds(viewerId);
+    const [hidden, suspended] = await Promise.all([
+      this.social.hiddenAuthorIds(viewerId),
+      this.social.suspendedAuthorIds(),
+    ]);
+    const invisible = [...new Set([...hidden, ...suspended])];
 
     const posts = (await this.prisma.post.findMany({
       where: {
         deletedAt: null,
         replyToId: null,
         ...(author ? { author: { username: author } } : {}),
-        ...(hidden.length ? { authorId: { notIn: hidden } } : {}),
+        ...(invisible.length ? { authorId: { notIn: invisible } } : {}),
       },
       orderBy: { createdAt: "desc" },
       take: 100,
@@ -549,13 +653,14 @@ export class PostsService {
         // The second clause withholds a private account's own reposts:
         // otherwise their profile would be empty of posts but still full of
         // everything they had reposted.
-        user: { username: author, ...(hidden.length ? { id: { notIn: hidden } } : {}) },
+        user: { username: author, ...(invisible.length ? { id: { notIn: invisible } } : {}) },
         post: {
           deletedAt: null,
           // A repost carries the original post's audience with it, so
           // reposting cannot surface a private account's post to people that
-          // account has not approved.
-          ...(hidden.length ? { authorId: { notIn: hidden } } : {}),
+          // account has not approved, nor keep a suspended account in
+          // circulation through someone else's profile.
+          ...(invisible.length ? { authorId: { notIn: invisible } } : {}),
         },
       },
       orderBy: { createdAt: "desc" },
@@ -600,7 +705,14 @@ export class PostsService {
     withPendingNotes = false,
   ): Promise<PresentedPost> {
     const post = (await this.prisma.post.findFirst({
-      where: { id, deletedAt: null, ...this.audienceFilter(await this.social.hiddenAuthorIds(viewerId)) },
+      where: {
+        id,
+        deletedAt: null,
+        ...this.audienceFilter(
+          await this.social.hiddenAuthorIds(viewerId),
+          await this.social.suspendedAuthorIds(),
+        ),
+      },
       select: POST_SELECT,
     })) as PostRow | null;
     // Deliberately the same 404 as a post that does not exist: a distinct
@@ -613,8 +725,13 @@ export class PostsService {
   /** Direct replies, oldest first, the way a conversation reads. */
   async replies(id: string, viewerId: string | null = null): Promise<PresentedPost[]> {
     await this.requirePost(id);
+    const suspended = await this.social.suspendedAuthorIds();
     const posts = (await this.prisma.post.findMany({
-      where: { replyToId: id, deletedAt: null },
+      where: {
+        replyToId: id,
+        deletedAt: null,
+        ...(suspended.length ? { authorId: { notIn: suspended } } : {}),
+      },
       orderBy: { createdAt: "asc" },
       take: 200,
       select: POST_SELECT,
