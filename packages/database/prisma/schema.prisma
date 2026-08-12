@@ -108,6 +108,8 @@ model User {
   followRequestsSent     FollowRequest[] @relation("FollowRequester")
   followRequestsReceived FollowRequest[] @relation("FollowRequestTarget")
   usernameHistory        UsernameChange[] @relation("UsernameChangeUser")
+  delegationsGranted     AccountDelegation[] @relation("DelegationOwner")
+  delegationsReceived    AccountDelegation[] @relation("DelegationDelegate")
   reportsFiled      Report[]       @relation("Reporter")
   reportsAgainst    Report[]       @relation("ReportedUser")
   moderationActions ModerationAction[] @relation("ModerationTarget")
@@ -134,6 +136,10 @@ model UserSession {
   id           String   @id @default(cuid())
   userId       String
   tokenHash    String   @unique
+  /// Set when a delegate opened this session for someone else's account, so a
+  /// delegated action can be traced to the person who actually took it.
+  /// Without it, delegation would be indistinguishable from a shared password.
+  delegatedById String?
   userAgent    String?
   ipAddress    String?
   expiresAt    DateTime
@@ -428,6 +434,32 @@ model Follow {
   @@id([followerId, followingId])
   @@index([followingId])
   @@index([followerId, createdAt(sort: Desc)])
+}
+
+/// Permission for one account to act as another.
+///
+/// X-style delegation: an owner invites a delegate, the delegate accepts, and
+/// from then on they can switch into the account without ever holding its
+/// password. Kept as its own row rather than a shared credential, because the
+/// point is that access is grantable and revocable without anything changing
+/// hands — and because every delegated session can then be traced back to the
+/// person who actually opened it.
+model AccountDelegation {
+  id          String   @id @default(cuid())
+  /// The account being acted for.
+  ownerId     String
+  /// The account allowed to act for it.
+  delegateId  String
+  /// pending until the delegate accepts. Declining deletes the row.
+  status      String   @default("pending")
+  createdAt   DateTime @default(now())
+  acceptedAt  DateTime?
+
+  owner    User @relation("DelegationOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  delegate User @relation("DelegationDelegate", fields: [delegateId], references: [id], onDelete: Cascade)
+
+  @@unique([ownerId, delegateId])
+  @@index([delegateId, status])
 }
 
 /// A follow waiting on a private account's approval.

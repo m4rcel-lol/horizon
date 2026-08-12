@@ -14,6 +14,7 @@ import { ProfileMenu } from "../components/ProfileMenu";
 import { ProfileCommunities } from "../components/CommunityCard";
 import { PageLoader } from "../components/LoadingSpinner";
 import { SeoHead } from "../components/SeoHead";
+import { SuspendedProfile } from "../components/SuspendedProfile";
 import { RichText } from "../components/RichText";
 import { useSession } from "../hooks/useSession";
 
@@ -75,6 +76,14 @@ export function ProfilePage() {
 
   const following = user?.followingCount ?? 0;
   const followers = user?.followersCount ?? 0;
+
+  // A suspended account has no profile to show. The server has already
+  // stripped it, so this is the whole page rather than a banner over an empty
+  // one — and moderators are exempt server-side, so they still see the account
+  // as it is.
+  if (user?.status === "SUSPENDED" && !isOwnProfile) {
+    return <SuspendedProfile username={user.username} />;
+  }
 
   return (
     <div className="animate-fade-in">

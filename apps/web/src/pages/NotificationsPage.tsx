@@ -89,6 +89,24 @@ function describe(n: ApiNotification): { Icon: typeof LikeIcon; colour: string; 
             colour: "var(--color-success, #00ba7c)",
             text: "now manages this automated account",
           };
+        case "DELEGATION_REQUEST":
+          return {
+            Icon: ProfileIcon,
+            colour: "var(--color-primary)",
+            text: "invited you to post as their account",
+          };
+        case "DELEGATION_ACCEPTED":
+          return {
+            Icon: ProfileIcon,
+            colour: "var(--color-success, #00ba7c)",
+            text: "accepted your delegation invitation",
+          };
+        case "DELEGATION_DECLINED":
+          return {
+            Icon: ProfileIcon,
+            colour: "var(--color-text-secondary)",
+            text: "declined your delegation invitation",
+          };
         case "AUTOMATION_DECLINED":
           return {
             Icon: RobotIcon,

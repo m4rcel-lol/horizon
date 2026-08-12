@@ -155,7 +155,10 @@ export class AuthService {
     return Boolean(row);
   }
 
-  async createSession(userId: string, meta: { userAgent?: string; ipAddress?: string }) {
+  async createSession(
+    userId: string,
+    meta: { userAgent?: string; ipAddress?: string; delegatedById?: string },
+  ) {
     const token = randomBytes(32).toString("base64url");
     const expiresAt = new Date(Date.now() + SESSION_IDLE_DAYS * 86400_000);
 
@@ -163,6 +166,9 @@ export class AuthService {
       data: {
         userId,
         tokenHash: this.hashToken(token),
+        // Records who opened it when a delegate did, so a delegated action is
+        // attributable to a person rather than only to the account.
+        delegatedById: meta.delegatedById ?? null,
         userAgent: meta.userAgent?.slice(0, 500),
         ipAddress: meta.ipAddress,
         expiresAt,

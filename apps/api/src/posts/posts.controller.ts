@@ -18,7 +18,7 @@ import { Type } from "class-transformer";
 import { PostsService } from "./posts.service";
 import { ScheduledPostsService } from "./scheduled-posts.service";
 import { DirectoryError } from "../users/user-directory.service";
-import { CurrentUser, Public } from "../auth/auth.decorators";
+import { CurrentUser, Public, RequirePermissions } from "../auth/auth.decorators";
 import { has, type AuthenticatedUser } from "../auth/authenticated-user";
 import { PERMISSIONS } from "@horizon/shared";
 
@@ -118,6 +118,26 @@ export class PostsController {
       }
       throw error;
     }
+  }
+
+  /**
+   * Posts as a moderator needs to find them. Declared before `:id` so
+   * "moderation" is matched as a literal segment rather than a post id.
+   */
+  @RequirePermissions(PERMISSIONS.POSTS_VIEW)
+  @Get("moderation/search")
+  async moderationSearch(
+    @Query("q") q?: string,
+    @Query("author") author?: string,
+    @Query("page") page?: string,
+  ) {
+    return this.unwrap(() =>
+      this.posts.moderationSearch({
+        query: q,
+        author,
+        page: page ? Number(page) : undefined,
+      }),
+    );
   }
 
   /** The timeline, newest first. `author` narrows it to one account. */
@@ -231,9 +251,13 @@ export class PostsController {
 
   /** The author may delete their own; a moderator may delete anyone's. */
   @Delete(":id")
-  async remove(@Param("id") id: string, @CurrentUser() auth: AuthenticatedUser) {
+  async remove(
+    @Param("id") id: string,
+    @CurrentUser() auth: AuthenticatedUser,
+    @Query("reason") reason?: string,
+  ) {
     return this.unwrap(() =>
-      this.posts.remove(id, auth.id, has(auth, PERMISSIONS.POSTS_DELETE)),
+      this.posts.remove(id, auth.id, has(auth, PERMISSIONS.POSTS_DELETE), reason),
     );
   }
 

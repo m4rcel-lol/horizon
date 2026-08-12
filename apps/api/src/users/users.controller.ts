@@ -2,6 +2,7 @@ import { Body, Controller, Delete, Get, HttpException, Param, Patch, Post, Query
 import { IsBoolean, IsIn, IsInt, IsOptional, IsString, Length, Matches, Max, Min } from "class-validator";
 import { PERMISSIONS, VERIFICATION_TYPES, type VerificationType } from "@horizon/shared";
 import { DirectoryError, UserDirectoryService } from "./user-directory.service";
+import { DelegationService } from "./delegation.service";
 import { CurrentUser, Public, RequirePermissions } from "../auth/auth.decorators";
 import {
   assertPermission,
@@ -118,7 +119,10 @@ class SetUsernameDto {
  */
 @Controller("users")
 export class UsersController {
-  constructor(private readonly directory: UserDirectoryService) {}
+  constructor(
+    private readonly directory: UserDirectoryService,
+    private readonly delegation: DelegationService,
+  ) {}
 
   private async unwrap<T>(fn: () => Promise<T> | T): Promise<T> {
     try {
@@ -177,8 +181,11 @@ export class UsersController {
 
   @Public()
   @Get(":username")
-  async get(@Param("username") username: string) {
-    return this.unwrap(async () => ({ user: await this.directory.get(username) }));
+  async get(@Param("username") username: string, @CurrentUser() auth: AuthenticatedUser | null) {
+    // Moderators see who a suspended account actually is; everyone else gets
+    // the stripped profile the suspension page is built from.
+    const reveal = Boolean(auth?.permissions?.has(PERMISSIONS.USERS_VIEW));
+    return this.unwrap(async () => ({ user: await this.directory.get(username, reveal) }));
   }
 
   /** Your own profile, or anyone's with the moderation permission. */
@@ -309,6 +316,46 @@ export class UsersController {
     return this.unwrap(async () => ({
       user: await this.directory.resolveAutomation(auth.id, username, body.approve),
     }));
+  }
+
+  /** People who may act for your account, and invitations you have sent. */
+  @Get("delegations/granted")
+  async delegationsGranted(@CurrentUser() auth: AuthenticatedUser) {
+    return this.unwrap(async () => ({ delegations: await this.delegation.forOwner(auth.id) }));
+  }
+
+  /** Accounts you may act for, and invitations waiting on you. */
+  @Get("delegations/received")
+  async delegationsReceived(@CurrentUser() auth: AuthenticatedUser) {
+    return this.unwrap(async () => ({ delegations: await this.delegation.forDelegate(auth.id) }));
+  }
+
+  /** Invite an account to act for yours. */
+  @Post("delegations")
+  async invite(@Body() body: AffiliateDto, @CurrentUser() auth: AuthenticatedUser) {
+    return this.unwrap(async () => ({
+      delegation: await this.delegation.invite(auth.id, body.username),
+    }));
+  }
+
+  /** Accept or decline an invitation to act for another account. */
+  @Post("delegations/:owner/respond")
+  async respondToDelegation(
+    @Param("owner") owner: string,
+    @Body() body: { approve: boolean },
+    @CurrentUser() auth: AuthenticatedUser,
+  ) {
+    return this.unwrap(() => this.delegation.respond(auth.id, owner, Boolean(body.approve)));
+  }
+
+  /** Either side may end a delegation. */
+  @Delete("delegations/:owner/:delegate")
+  async revokeDelegation(
+    @Param("owner") owner: string,
+    @Param("delegate") delegate: string,
+    @CurrentUser() auth: AuthenticatedUser,
+  ) {
+    return this.unwrap(() => this.delegation.revoke(auth.id, owner, delegate));
   }
 
   /** The affiliate may leave; their organisation, or an admin, may remove them. */

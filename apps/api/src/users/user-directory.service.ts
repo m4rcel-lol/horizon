@@ -232,7 +232,14 @@ export class UserDirectoryService implements OnModuleInit {
     };
   }
 
-  private async present(user: UserRow): Promise<PresentedUser> {
+  /**
+   * @param revealSuspended show a suspended account's real profile anyway.
+   *        Moderation needs to see who it is looking at; the public does not.
+   */
+  private async present(user: UserRow, revealSuspended = false): Promise<PresentedUser> {
+    if (user.status === "SUSPENDED" && !revealSuspended) {
+      return this.presentSuspended(user);
+    }
     const type = effectiveVerification(user.verification, Boolean(user.affiliatedToId));
     const presentation = verificationPresentation(type);
 
@@ -357,11 +364,64 @@ export class UserDirectoryService implements OnModuleInit {
       this.prisma.user.count({ where }),
     ]);
 
-    return { users: await Promise.all(rows.map((u) => this.present(u))), total, page, perPage };
+    // Moderation: a suspended account is shown as it really is, which is the
+    // whole point of the page it appears on.
+    return {
+      users: await Promise.all(rows.map((u) => this.present(u, true))),
+      total,
+      page,
+      perPage,
+    };
   }
 
-  async get(username: string): Promise<PresentedUser> {
-    return this.present(await this.row(username));
+  /**
+   * A suspended account, as everyone but a moderator sees it.
+   *
+   * Everything the account chose about itself is withheld — picture, banner,
+   * bio, badge, links, counts — because a suspended profile that still shows
+   * its bio and follower count is not suspended in any sense a reader would
+   * recognise. The handle stays: it is in the URL that got them here, and the
+   * page has to be able to say which account this is about.
+   */
+  private presentSuspended(user: UserRow): PresentedUser {
+    return {
+      id: user.id,
+      username: user.username,
+      displayName: user.username,
+      bio: null,
+      avatarUrl: null,
+      bannerUrl: null,
+      verification: "NONE",
+      effectiveVerification: "NONE",
+      badge: null,
+      avatarShape: "circle",
+      verificationLabel: verificationPresentation("NONE").label,
+      canAffiliate: false,
+      affiliatedTo: null,
+      affiliatedAt: null,
+      affiliateCount: 0,
+      status: "SUSPENDED",
+      // The reason is a moderation record, not a public notice: the page says
+      // an account is suspended, not what it is accused of.
+      suspension: null,
+      isSystem: user.isSystem,
+      loginDisabled: user.loginDisabled,
+      isAdmin: false,
+      isProtected: false,
+      website: null,
+      location: null,
+      pronouns: null,
+      birthday: null,
+      followingCount: 0,
+      followersCount: 0,
+      automatedBy: null,
+      automatedPending: false,
+      createdAt: user.createdAt.toISOString(),
+    };
+  }
+
+  async get(username: string, revealSuspended = false): Promise<PresentedUser> {
+    return this.present(await this.row(username), revealSuspended);
   }
 
   /** Like get(), but returns null for an unknown handle instead of throwing. */
