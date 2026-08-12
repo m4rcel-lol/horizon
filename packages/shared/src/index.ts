@@ -167,6 +167,7 @@ export const RESERVED_USERNAMES: ReadonlySet<string> = new Set([
   "status",
   "communitynotes",
   "news",
+  "rules",
 ]);
 
 /** Centralized permission keys */

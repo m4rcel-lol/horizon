@@ -3,12 +3,12 @@ import { ArrowLeftIcon } from "../icons";
 import { SeoHead } from "../components/SeoHead";
 
 /**
- * Horizon News.
+ * Horizon Rules.
  *
  * The page a suspension notice points at, so it has to answer the question
- * someone arrives with: what happened to that account, and what are the rules
- * here. Static content rather than a feed — an instance announcement channel
- * is a thing an operator writes, not something to fabricate a data model for.
+ * someone arrives with: what gets an account suspended here, and what can be
+ * done about it. Static content — the rules of an instance are something an
+ * operator writes, not something to fabricate a data model for.
  */
 const ENTRIES = [
   {
@@ -38,26 +38,27 @@ const ENTRIES = [
   },
 ];
 
-export function NewsPage() {
+export function RulesPage() {
   const navigate = useNavigate();
 
   return (
     <div className="animate-fade-in">
       <SeoHead
-        title="Horizon News"
-        description="Announcements and the rules of this instance."
-        url="/news"
+        title="Horizon Rules"
+        description="The rules of this instance, and what happens when an account breaks them."
+        url="/rules"
       />
       <header className="x-header gap-6">
         <button type="button" onClick={() => navigate(-1)} className="icon-btn -ml-2" aria-label="Back">
           <ArrowLeftIcon className="w-5 h-5" />
         </button>
-        <h1 className="x-title">Horizon News</h1>
+        <h1 className="x-title">Horizon Rules</h1>
       </header>
 
       <div className="px-4 py-4 border-b" style={{ borderColor: "var(--color-border)" }}>
         <p className="text-[15px]" style={{ color: "var(--color-text-secondary)" }}>
-          Announcements from this instance, and the rules an account is expected to keep to.
+          The rules an account is expected to keep to on this instance, and what happens when one
+          does not.
         </p>
       </div>
 

@@ -30,7 +30,7 @@ import { AdminOverviewPage } from "./pages/AdminOverviewPage";
 import { AdminUsersPage } from "./pages/AdminUsersPage";
 import { AdminPostsPage } from "./pages/AdminPostsPage";
 import { MaintenanceScreen } from "./components/MaintenanceScreen";
-import { NewsPage } from "./pages/NewsPage";
+import { RulesPage } from "./pages/RulesPage";
 import { AdminStatisticsPage } from "./pages/AdminStatisticsPage";
 import { AdminNotesPage } from "./pages/AdminNotesPage";
 import { UserStatsPage } from "./pages/UserStatsPage";
@@ -157,7 +157,10 @@ export default function App() {
           <Route path="delegation" element={<SettingsDelegationPage />} />
         </Route>
         <Route path="/messages/:id" element={<ConversationPage />} />
-        <Route path="/news" element={<NewsPage />} />
+        <Route path="/rules" element={<RulesPage />} />
+        {/* The first version of the suspension notice linked here, so it stays
+            pointed at the page rather than becoming a dead link. */}
+        <Route path="/news" element={<Navigate to="/rules" replace />} />
         <Route path="/communities/:slug" element={<CommunityPage />} />
         <Route path="/communities/:slug/requests" element={<CommunityJoinRequestsPage />} />
         <Route path="/:username/affiliates" element={<AffiliatesPage />} />
