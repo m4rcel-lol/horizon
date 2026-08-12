@@ -55,8 +55,8 @@ export function SuspendedProfile({ username }: { username: string }) {
         <h2>Profile suspended</h2>
         <p>
           This user has been suspended for breaking{" "}
-          <Link to="/news" className="link">
-            Horizon news
+          <Link to="/rules" className="link">
+            Horizon rules
           </Link>
           .
         </p>
