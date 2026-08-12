@@ -8,6 +8,7 @@ import { PostCard } from "../components/PostCard";
 import { EditProfileModal } from "../components/EditProfileModal";
 import { ComposerModal, type ComposerTarget } from "../components/ComposerModal";
 import { FollowButton } from "../components/FollowButton";
+import { MessageButton } from "../components/MessageButton";
 import { FollowsYouChip } from "../components/FollowsYouChip";
 import { ProfileMenu } from "../components/ProfileMenu";
 import { ProfileCommunities } from "../components/CommunityCard";
@@ -128,7 +129,10 @@ export function ProfilePage() {
                 Edit profile
               </button>
             ) : user ? (
-              <FollowButton username={user.username} />
+              <>
+                <MessageButton user={user} onMention={() => setComposing({ mode: "mention", user })} />
+                <FollowButton username={user.username} />
+              </>
             ) : null}
           </div>
         </div>

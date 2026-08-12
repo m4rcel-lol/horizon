@@ -6,7 +6,7 @@ import { useSession } from "../hooks/useSession";
 import { PERMISSIONS } from "@horizon/shared";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Avatar, NameWithBadges } from "../components/Verification";
-import { api, ApiError } from "../api";
+import { api, ApiError, type DmPermission } from "../api";
 
 const sections = [
   { to: "/settings/appearance", label: "Appearance", description: "Theme and display" },
@@ -258,15 +258,24 @@ export function SettingsAccountPage() {
 export function SettingsPrivacyPage() {
   const { active, refresh } = useSession();
   const [isProtected, setIsProtected] = useState(Boolean(active?.isProtected));
-  const [dmPermission, setDmPermission] = useState(
-    () => localStorage.getItem("horizon_dm_permission") || "mutuals",
-  );
+  // Server-held: this governs who may open a conversation with you, so it has
+  // to be somewhere the server can read. It used to live in localStorage,
+  // which made it per-device and invisible to the code enforcing it.
+  const [dmPermission, setDmPermission] = useState<DmPermission>("mutuals");
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
   useEffect(() => {
     setIsProtected(Boolean(active?.isProtected));
   }, [active?.isProtected]);
+
+  useEffect(() => {
+    if (!active) return;
+    api
+      .dmSettings()
+      .then((d) => setDmPermission(d.dmPermission))
+      .catch(() => undefined);
+  }, [active]);
 
   async function saveProtected(next: boolean) {
     if (!active?.username) return;
@@ -285,10 +294,17 @@ export function SettingsPrivacyPage() {
     }
   }
 
-  function saveDm(next: string) {
+  async function saveDm(next: DmPermission) {
+    const previous = dmPermission;
     setDmPermission(next);
-    localStorage.setItem("horizon_dm_permission", next);
-    setMessage("Message preference saved on this device.");
+    setMessage(null);
+    try {
+      await api.setDmSettings(next);
+      setMessage("Message preference saved.");
+    } catch (err) {
+      setDmPermission(previous);
+      setMessage(err instanceof Error ? err.message : "Could not save that.");
+    }
   }
 
   return (
@@ -348,7 +364,7 @@ export function SettingsPrivacyPage() {
                 name="dm"
                 value={opt.value}
                 checked={dmPermission === opt.value}
-                onChange={() => saveDm(opt.value)}
+                onChange={() => void saveDm(opt.value)}
                 className="accent-[var(--color-primary)]"
               />
               <span className="flex-1">

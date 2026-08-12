@@ -1,11 +1,21 @@
 import { useEffect, useRef, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { api, ApiError, type ApiPost } from "../api";
+import { api, ApiError, type ApiPost, type ApiUser } from "../api";
 import { Avatar } from "./Verification";
 import { QuotedPost } from "./PostCard";
 import { useSession } from "../hooks/useSession";
 
-export type ComposerTarget = { mode: "reply" | "quote"; post: ApiPost } | null;
+export type ComposerTarget =
+  | { mode: "reply" | "quote"; post: ApiPost }
+  /**
+   * A plain post opened with someone already mentioned.
+   *
+   * This is what the profile's Message button becomes when an account has
+   * direct messages turned off: there is still a way to reach them in public,
+   * which is the point of offering it instead of a dead button.
+   */
+  | { mode: "mention"; user: ApiUser }
+  | null;
 
 const MAX = 500;
 
@@ -32,7 +42,7 @@ export function ComposerModal({
 
   useEffect(() => {
     if (!target) return;
-    setText("");
+    setText(target.mode === "mention" ? `@${target.user.username} ` : "");
     setError(null);
     const focus = window.setTimeout(() => box.current?.focus(), 50);
     const onKey = (event: KeyboardEvent) => event.key === "Escape" && onClose();
@@ -50,7 +60,11 @@ export function ComposerModal({
     mutationFn: (content: string) =>
       api.createPost(
         content,
-        target?.mode === "reply" ? { replyToId: target.post.id } : { quoteOfId: target!.post.id },
+        target?.mode === "reply"
+          ? { replyToId: target.post.id }
+          : target?.mode === "quote"
+            ? { quoteOfId: target.post.id }
+            : {},
       ),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["posts"] });
@@ -63,6 +77,7 @@ export function ComposerModal({
 
   if (!target) return null;
   const isReply = target.mode === "reply";
+  const isMention = target.mode === "mention";
   const remaining = MAX - text.length;
 
   return (
@@ -70,7 +85,7 @@ export function ComposerModal({
       className="fixed inset-0 z-[100] flex items-start justify-center pt-[6vh] px-4"
       role="dialog"
       aria-modal="true"
-      aria-label={isReply ? "Write a reply" : "Quote this post"}
+      aria-label={isReply ? "Write a reply" : isMention ? "Mention someone" : "Quote this post"}
     >
       <button type="button" className="absolute inset-0 bg-black/50" aria-label="Close" onClick={onClose} />
 
@@ -86,12 +101,12 @@ export function ComposerModal({
             ✕
           </button>
           <h2 className="flex-1 text-[17px] font-extrabold">
-            {isReply ? "Reply" : "Quote"}
+            {isReply ? "Reply" : isMention ? "New post" : "Quote"}
           </h2>
         </div>
 
         <div className="px-4 py-3">
-          {isReply ? (
+          {isReply && target.mode === "reply" ? (
             <p className="text-[14px] mb-3" style={{ color: "var(--color-text-secondary)" }}>
               Replying to <span className="link">@{target.post.authorUsername}</span>
             </p>
@@ -108,14 +123,16 @@ export function ComposerModal({
                 ref={box}
                 className="w-full bg-transparent text-[18px] leading-6 outline-none resize-none"
                 style={{ minHeight: 90 }}
-                placeholder={isReply ? "Post your reply" : "Add a comment"}
+                placeholder={
+                  isReply ? "Post your reply" : isMention ? "What's happening?" : "Add a comment"
+                }
                 maxLength={MAX}
                 value={text}
                 onChange={(event) => setText(event.target.value)}
               />
 
               {/* What is being quoted, in the same card it keeps once posted. */}
-              {!isReply ? <QuotedPost post={target.post} /> : null}
+              {target.mode === "quote" ? <QuotedPost post={target.post} /> : null}
             </div>
           </div>
 
