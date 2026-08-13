@@ -230,6 +230,13 @@ export class PostsController {
     return this.unwrap(async () => ({ post: await this.posts.get(id, auth?.id ?? null, true) }));
   }
 
+  /** The chain of posts this one is replying to, oldest first. */
+  @Public()
+  @Get(":id/ancestors")
+  async ancestors(@Param("id") id: string, @CurrentUser() auth: AuthenticatedUser | null) {
+    return this.unwrap(async () => ({ posts: await this.posts.ancestors(id, auth?.id ?? null) }));
+  }
+
   @Public()
   @Get(":id/replies")
   async replies(@Param("id") id: string, @CurrentUser() auth: AuthenticatedUser | null) {

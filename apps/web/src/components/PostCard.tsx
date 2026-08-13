@@ -98,6 +98,7 @@ export function PostCard({
   onReply,
   onQuote,
   showCommunity = true,
+  inThread = false,
 }: {
   post: ApiPost;
   /** Full view: larger type, timestamp on its own line, notes rateable. */
@@ -108,6 +109,13 @@ export function PostCard({
   onQuote?: (post: ApiPost) => void;
   /** Off on a community's own page, where the line would repeat on every row. */
   showCommunity?: boolean;
+  /**
+   * This card is a link in a reply chain above the post being read.
+   *
+   * Draws a line from its avatar down to the next card, which is what makes a
+   * stack of posts read as one conversation rather than as unrelated rows.
+   */
+  inThread?: boolean;
 }) {
   const navigate = useNavigate();
   const author = post.author;
@@ -268,10 +276,17 @@ export function PostCard({
       onKeyDown={(event) => {
         if (event.key === "Enter") navigate(permalink);
       }}
-      className="flex gap-3 px-4 py-3 border-b cursor-pointer transition-colors hover:bg-[var(--color-row-hover)]"
+      // A thread link has no bottom border: the connector line runs through
+      // where it would be, and a rule across it would cut the chain in two.
+      className={`flex gap-3 px-4 pt-3 cursor-pointer transition-colors hover:bg-[var(--color-row-hover)] ${
+        inThread ? "pb-1" : "pb-3 border-b"
+      }`}
       style={{ borderColor: "var(--color-border)" }}
     >
-      <div className="shrink-0" style={{ paddingTop: post.repostedBy ? 22 : 0 }}>
+      <div
+        className="shrink-0 flex flex-col items-center"
+        style={{ paddingTop: post.repostedBy ? 22 : 0 }}
+      >
         <Link to={`/${handle}`} onClick={(event) => event.stopPropagation()}>
           <Avatar
             shape={author?.avatarShape ?? "circle"}
@@ -279,6 +294,13 @@ export function PostCard({
             src={author?.avatarUrl || "/assets/default-avatar.svg"}
           />
         </Link>
+        {inThread ? (
+          <span
+            aria-hidden="true"
+            className="flex-1 w-[2px] mt-1 rounded"
+            style={{ background: "var(--color-border)", minHeight: 12 }}
+          />
+        ) : null}
       </div>
       <div className="min-w-0 flex-1">
         {repostHeader}

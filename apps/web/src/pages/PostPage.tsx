@@ -26,6 +26,16 @@ export function PostPage() {
     retry: false,
   });
 
+  // What this post is answering. A reply on its own page is half a
+  // conversation without it — the reader arrives at an answer to something
+  // they cannot see.
+  const { data: ancestorData } = useQuery({
+    queryKey: ["ancestors", postId],
+    queryFn: () => api.ancestors(postId ?? ""),
+    enabled: Boolean(postId) && !(error instanceof ApiError && error.status === 404),
+    retry: false,
+  });
+
   const { data: replyData } = useQuery({
     queryKey: ["replies", postId],
     queryFn: () => api.replies(postId ?? ""),
@@ -52,6 +62,7 @@ export function PostPage() {
 
   const post = data?.post;
   const replies = replyData?.posts ?? [];
+  const ancestors = ancestorData?.posts ?? [];
   const missing = error instanceof ApiError && error.status === 404;
 
   const openReply = (target: ApiPost) => setComposing({ mode: "reply", post: target });
@@ -90,6 +101,13 @@ export function PostPage() {
         </div>
       ) : post ? (
         <>
+          {/* The chain that led here, oldest first, each one a card you can
+              open in turn — so following a reply upwards keeps working however
+              deep the conversation goes. */}
+          {ancestors.map((a) => (
+            <PostCard key={a.id} post={a} inThread onReply={openReply} onQuote={openQuote} />
+          ))}
+
           <PostCard
             post={post}
             detail
