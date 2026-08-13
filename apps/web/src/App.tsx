@@ -31,6 +31,7 @@ import { AdminUsersPage } from "./pages/AdminUsersPage";
 import { AdminPostsPage } from "./pages/AdminPostsPage";
 import { MaintenanceScreen } from "./components/MaintenanceScreen";
 import { RulesPage } from "./pages/RulesPage";
+import { NotFoundPage } from "./pages/NotFoundPage";
 import { AdminStatisticsPage } from "./pages/AdminStatisticsPage";
 import { AdminNotesPage } from "./pages/AdminNotesPage";
 import { UserStatsPage } from "./pages/UserStatsPage";
@@ -169,6 +170,10 @@ export default function App() {
         <Route path="/:username/following" element={<FollowListPage mode="following" />} />
         <Route path="/:username" element={<ProfilePage />} />
         <Route path="/:username/status/:postId" element={<PostPage />} />
+        {/* Anything else. Without this an unmatched path rendered nothing at
+            all — a white screen that reads as a broken app rather than a URL
+            that does not exist. */}
+        <Route path="*" element={<NotFoundPage />} />
       </Route>
     </Routes>
     </>

@@ -129,45 +129,65 @@ export interface InstanceInfo {
 }
 
 /**
- * Handles nobody may take.
+ * The first segment of every page that is not a profile.
  *
- * Shared because two paths hand out usernames — registration and renaming —
- * and a list that lives in only one of them means a name blocked at sign-up is
- * still reachable by renaming into it.
+ * A profile lives at `/:username`, so any word that is also a page has to be
+ * refused as a handle — otherwise the two collide and one of them loses. This
+ * list is what makes that guarantee, and adding a top-level page without
+ * adding it here is exactly the mistake that puts a fake profile at the new
+ * page's address.
  */
-export const RESERVED_USERNAMES: ReadonlySet<string> = new Set([
-  "admin",
-  "administrator",
-  "api",
+export const ROUTE_SEGMENTS: readonly string[] = [
   "about",
+  "admin",
+  "bookmarks",
+  // The community shortcut, /c/:slug.
+  "c",
+  "communities",
+  "docs",
   "explore",
+  "hashtag",
   "home",
+  "lists",
   "login",
-  "logout",
   "messages",
-  "notifications",
+  "news",
   "notes",
+  "notifications",
+  "privacy",
+  "profile",
+  "register",
+  "rules",
   "settings",
   "setup",
-  "register",
-  "signup",
-  "search",
-  "support",
-  "help",
-  "docs",
-  "privacy",
   "terms",
-  "root",
-  "system",
-  "horizon",
-  "communities",
-  "bookmarks",
-  "lists",
-  "profile",
-  "status",
+];
+
+/**
+ * Handles nobody may take.
+ *
+ * Shared because three things hand out or resolve usernames — registration,
+ * renaming, and the profile route — and a list living in only one of them
+ * means a name blocked at sign-up is still reachable by renaming into it, or a
+ * page's address still renders as somebody's profile.
+ *
+ * Every route segment is in here by construction, plus words that are not
+ * pages but should not be handles either.
+ */
+export const RESERVED_USERNAMES: ReadonlySet<string> = new Set([
+  ...ROUTE_SEGMENTS,
+  "administrator",
+  "api",
   "communitynotes",
-  "news",
-  "rules",
+  "help",
+  "horizon",
+  "logout",
+  "root",
+  "search",
+  "signup",
+  "status",
+  "support",
+  "system",
 ]);
 
 /** Centralized permission keys */

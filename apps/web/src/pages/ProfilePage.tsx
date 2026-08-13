@@ -15,6 +15,8 @@ import { ProfileCommunities } from "../components/CommunityCard";
 import { PageLoader } from "../components/LoadingSpinner";
 import { SeoHead } from "../components/SeoHead";
 import { SuspendedProfile } from "../components/SuspendedProfile";
+import { NotFoundPage } from "./NotFoundPage";
+import { RESERVED_USERNAMES } from "@horizon/shared";
 import { RichText } from "../components/RichText";
 import { useSession } from "../hooks/useSession";
 
@@ -31,11 +33,18 @@ export function ProfilePage() {
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
+  // A page's address is not a profile. Without this, any top-level route the
+  // profile route also matches — because it was added without being reserved,
+  // or because the visitor typed a route prefix like /c — renders as an
+  // account that does not exist, which reads as a broken profile rather than
+  // a wrong URL.
+  const isRouteWord = RESERVED_USERNAMES.has(handle.toLowerCase());
+
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ["user", handle],
     queryFn: () => api.getUser(handle),
     retry: false,
-    enabled: Boolean(handle),
+    enabled: Boolean(handle) && !isRouteWord,
   });
 
   const user = data?.user;
@@ -76,6 +85,8 @@ export function ProfilePage() {
 
   const following = user?.followingCount ?? 0;
   const followers = user?.followersCount ?? 0;
+
+  if (isRouteWord && !isOwnProfile) return <NotFoundPage />;
 
   // A suspended account has no profile to show. The server has already
   // stripped it, so this is the whole page rather than a banner over an empty
