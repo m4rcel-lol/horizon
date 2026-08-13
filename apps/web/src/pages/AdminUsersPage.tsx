@@ -81,7 +81,7 @@ export function AdminUsersPage() {
   });
 
   return (
-    <div className="animate-fade-in">
+    <div className="animate-page">
       <form
         className="flex flex-wrap gap-2 mb-4"
         onSubmit={(e) => {

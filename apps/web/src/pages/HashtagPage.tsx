@@ -25,7 +25,7 @@ export function HashtagPage() {
   );
 
   return (
-    <div className="animate-fade-in">
+    <div className="animate-page">
       <header className="x-header gap-6">
         <button type="button" onClick={() => navigate(-1)} className="icon-btn -ml-2" aria-label="Back">
           <ArrowLeftIcon className="w-5 h-5" />

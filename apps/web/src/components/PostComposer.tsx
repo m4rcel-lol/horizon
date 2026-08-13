@@ -305,7 +305,9 @@ export function PostComposer({
         <div className="relative mt-1 mb-1">
           <button
             type="button"
-            className="text-[14px] font-bold link"
+            // Padded rather than resized: the label stays small, the thing a
+            // thumb has to land on does not.
+            className="text-[14px] font-bold link -mx-2 px-2 py-2 rounded-full"
             onClick={() => setAudienceOpen((o) => !o)}
             aria-haspopup="listbox"
             aria-expanded={audienceOpen}

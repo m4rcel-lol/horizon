@@ -63,6 +63,12 @@
 
 html {
   background: var(--color-bg);
+  /*
+   * Stop iOS inflating text when a phone is turned to landscape. Left alone,
+   * the same paragraph is a different size in each orientation.
+   */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
 
 body {
@@ -352,16 +358,76 @@ body {
  * z-index it carried. `backwards` still applies the from-state during the
  * stagger delay, which is the only reason the fill mode was there.
  */
+
+/*
+ * Arriving content, inside a page that is already there.
+ *
+ * Short and barely displaced. This used to be the page-level entrance too, at
+ * 250ms with a 4px lift, which meant every navigation drifted into place
+ * instead of landing — a quarter second of waiting for something that was
+ * already fetched.
+ */
 .animate-fade-in {
-  animation: horizon-fade-in 0.25s ease-out backwards;
+  animation: horizon-fade-in 0.16s ease-out backwards;
 }
-/* Menus, pickers and lightboxes: they appear at a point, so they scale from it. */
+
+/*
+ * A page.
+ *
+ * Nothing. A destination you asked for should be there when you arrive; the
+ * motion budget is better spent on the things that genuinely appear — menus,
+ * modals, rows arriving in a list — which is where it now goes.
+ *
+ * Kept as a class rather than deleted from the pages so the intent stays
+ * legible: a page root says what it is, and the answer to "how does a page
+ * enter" lives here, in one place, instead of being 22 files' worth of
+ * remembering not to add a fade.
+ */
+.animate-page {
+  animation: none;
+}
+
+/*
+ * Menus, pickers and lightboxes: they appear at a point, so they scale from it.
+ *
+ * Slightly longer and eased out of the overshoot now that pages are instant —
+ * a menu is a thing that genuinely was not there a moment ago, and reads
+ * better for being seen to arrive.
+ */
 .animate-pop-in {
-  animation: horizon-pop-in 0.15s ease-out backwards;
+  animation: horizon-pop-in 0.19s cubic-bezier(0.2, 0.9, 0.3, 1.05) backwards;
 }
+
+/* A dialog's backdrop, so the page behind it recedes rather than blinking. */
+.animate-backdrop {
+  animation: horizon-fade-in 0.18s ease-out backwards;
+}
+
 /* Rows arriving in a list. */
 .animate-slide-up {
-  animation: horizon-slide-up 0.28s cubic-bezier(0.2, 0, 0.2, 1) backwards;
+  animation: horizon-slide-up 0.24s cubic-bezier(0.2, 0, 0.2, 1) backwards;
+}
+
+/*
+ * A press.
+ *
+ * Touch has no hover, so without this a tap on a phone gives nothing back
+ * until the next screen paints — the single biggest reason an interface feels
+ * unresponsive on a device rather than a desktop.
+ */
+.btn:active:not(:disabled),
+.icon-btn:active:not(:disabled),
+.nav-item:active {
+  transform: scale(0.97);
+}
+.btn,
+.icon-btn,
+.nav-item {
+  transition:
+    background-color 0.12s ease,
+    color 0.12s ease,
+    border-color 0.12s ease,
+    transform 0.08s ease;
 }
 
 /*
@@ -383,14 +449,86 @@ body {
 }
 
 /*
+ * Touch.
+ *
+ * Keyed on `pointer: coarse` rather than a width breakpoint: what matters is
+ * whether the thing doing the pointing is a finger, not how wide the window
+ * is. A small desktop window keeps its compact controls; a large tablet gets
+ * the roomy ones.
+ */
+@media (pointer: coarse) {
+  /*
+   * 44px is the smallest a finger reliably hits. Everything here was 36,
+   * sized for a cursor — fine with a mouse, a coin-toss with a thumb.
+   * Grown by padding rather than by the icon, so nothing looks inflated.
+   */
+  .icon-btn {
+    width: 44px;
+    height: 44px;
+  }
+  .btn {
+    min-height: 44px;
+  }
+
+  /*
+   * A post's action row is six targets side by side. At 44px each they are
+   * wider than a small phone, so the row keeps the tap area and gives up the
+   * spacing between them rather than overflowing the screen.
+   */
+  .post-actions {
+    gap: 0;
+  }
+  .post-actions > * {
+    flex: 1 1 0;
+    justify-content: flex-start;
+  }
+
+  /*
+   * iOS Safari zooms the whole page when a field smaller than 16px takes
+   * focus, and does not zoom back out. Every field here was 15px, so tapping
+   * a search box or a reply field left the layout stranded mid-zoom.
+   */
+  .x-search,
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
+
+  /*
+   * The grey flash the browser paints over a tapped element, which fires on
+   * scroll as well as on taps and lags behind the press feedback above.
+   */
+  a,
+  button,
+  [role="button"] {
+    -webkit-tap-highlight-color: transparent;
+  }
+}
+
+/*
+ * A sheet or dialog should not hand its scroll to the page underneath when it
+ * reaches its own end — on a phone that reads as the background lurching.
+ */
+.overscroll-contain-y {
+  overscroll-behavior-y: contain;
+}
+
+/*
  * Everything above is motion for its own sake to anyone who has asked their
  * system not to move things. Honour that rather than making them watch it.
  */
 @media (prefers-reduced-motion: reduce) {
   .animate-fade-in,
   .animate-pop-in,
+  .animate-backdrop,
   .animate-slide-up {
     animation: none;
+  }
+  .btn:active:not(:disabled),
+  .icon-btn:active:not(:disabled),
+  .nav-item:active {
+    transform: none;
   }
   .skeleton {
     animation: none;

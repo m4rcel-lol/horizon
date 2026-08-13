@@ -42,7 +42,7 @@ export function RulesPage() {
   const navigate = useNavigate();
 
   return (
-    <div className="animate-fade-in">
+    <div className="animate-page">
       <SeoHead
         title="Horizon Rules"
         description="The rules of this instance, and what happens when an account breaks them."

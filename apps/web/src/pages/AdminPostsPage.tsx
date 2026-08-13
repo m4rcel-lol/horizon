@@ -48,7 +48,7 @@ export function AdminPostsPage() {
   const pages = Math.max(1, Math.ceil(total / (data?.perPage ?? 25)));
 
   return (
-    <div className="animate-fade-in">
+    <div className="animate-page">
       <form
         className="flex flex-wrap gap-2 mb-4"
         onSubmit={(e) => {

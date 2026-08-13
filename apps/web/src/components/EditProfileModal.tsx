@@ -141,7 +141,7 @@ export function EditProfileModal({
 
   return (
     <div
-      className="fixed inset-0 z-[100] flex items-start justify-center pt-[5vh] px-4"
+      className="fixed inset-0 z-[100] flex items-start justify-center pt-[5vh] px-4 animate-backdrop overscroll-contain-y"
       role="dialog"
       aria-modal="true"
       aria-labelledby="edit-profile-title"

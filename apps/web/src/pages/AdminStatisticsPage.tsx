@@ -23,7 +23,7 @@ export function AdminStatisticsPage() {
 
   const s = data.stats;
   return (
-    <div className="animate-fade-in">
+    <div className="animate-page">
       <DailyBars data={s.daily} label="Posts per day, last 14 days" />
 
       <StatGroup title="Accounts">

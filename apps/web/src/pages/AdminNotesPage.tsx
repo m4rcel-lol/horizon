@@ -78,7 +78,7 @@ export function AdminNotesPage() {
   const canWrite = postId.trim().length > 0 && body.trim().length >= 10;
 
   return (
-    <div className="animate-fade-in">
+    <div className="animate-page">
       <section
         className="rounded-2xl border p-4 mb-6"
         style={{ borderColor: "var(--color-border)" }}

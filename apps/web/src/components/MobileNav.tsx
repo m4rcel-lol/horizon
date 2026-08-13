@@ -77,7 +77,13 @@ export function MobileTopBar({ onOpenDrawer }: { onOpenDrawer: () => void }) {
         )}
       </button>
 
-      <Link to="/" className="mx-auto" aria-label="Horizon home">
+      {/* The logo is 28px of artwork; the link around it is a full touch
+          target, so the tap area is not the size of the picture. */}
+      <Link
+        to="/"
+        className="mx-auto icon-btn"
+        aria-label="Horizon home"
+      >
         <img src="/assets/logo.svg" alt="" className="w-7 h-7" />
       </Link>
 

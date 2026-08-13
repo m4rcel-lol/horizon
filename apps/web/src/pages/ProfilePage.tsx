@@ -97,7 +97,7 @@ export function ProfilePage() {
   }
 
   return (
-    <div className="animate-fade-in">
+    <div className="animate-page">
       <SeoHead
         title={user ? `${user.displayName} (@${user.username})` : `@${handle}`}
         description={user?.bio || `@${handle} on Horizon`}

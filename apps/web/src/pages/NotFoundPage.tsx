@@ -14,7 +14,7 @@ export function NotFoundPage() {
   const location = useLocation();
 
   return (
-    <div className="animate-fade-in">
+    <div className="animate-page">
       <SeoHead title="Page not found" description="This page does not exist on Horizon." />
       <header className="x-header gap-6">
         <button type="button" onClick={() => navigate(-1)} className="icon-btn -ml-2" aria-label="Back">

@@ -205,7 +205,7 @@ function NewConversationModal({ onClose }: { onClose: () => void }) {
 
   return (
     <div
-      className="fixed inset-0 z-[300] flex items-center justify-center p-4"
+      className="fixed inset-0 z-[300] flex items-center justify-center p-4 animate-backdrop overscroll-contain-y"
       style={{ background: "rgba(0,0,0,0.4)" }}
       onClick={onClose}
     >

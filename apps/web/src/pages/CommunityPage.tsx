@@ -41,7 +41,7 @@ export function CommunityPage() {
   const isOwner = active && community && active.username === community.owner.username;
 
   return (
-    <div className="animate-fade-in">
+    <div className="animate-page">
       <header className="x-header gap-6">
         <button type="button" onClick={() => navigate(-1)} className="icon-btn -ml-2" aria-label="Back">
           <ArrowLeftIcon className="w-5 h-5" />
@@ -197,7 +197,7 @@ function CommunitySettingsModal({
   const [saving, setSaving] = useState(false);
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-start justify-center pt-[8vh] px-4">
+    <div className="fixed inset-0 z-[100] flex items-start justify-center pt-[8vh] px-4 animate-backdrop overscroll-contain-y">
       <button type="button" className="absolute inset-0 bg-black/40" aria-label="Close" onClick={onClose} />
       <form
         className="relative w-full max-w-[480px] max-h-[90vh] overflow-y-auto rounded-2xl border p-4 shadow-xl"
