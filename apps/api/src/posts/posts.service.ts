@@ -115,6 +115,14 @@ type PostRow = {
   communityPosts: { community: { slug: string; name: string; avatarUrl: string | null } }[];
 };
 
+/**
+ * How far up a reply chain a thread view will walk.
+ *
+ * Deep enough that no real conversation is truncated, shallow enough that one
+ * page load cannot become an unbounded series of queries.
+ */
+const MAX_THREAD_DEPTH = 20;
+
 /** Posts, stored in Postgres. */
 @Injectable()
 export class PostsService {
@@ -720,6 +728,59 @@ export class PostsService {
     // hiding it was for.
     if (!post) throw new DirectoryError("POST_NOT_FOUND", `No post ${id} on this instance.`, 404);
     return this.present(post, viewerId, 0, withPendingNotes);
+  }
+
+  /**
+   * Everything the post is a reply to, oldest first.
+   *
+   * A reply on its own page is half a conversation: it answers something the
+   * reader cannot see. Walking up `replyToId` gives the chain that led to it,
+   * which is what a thread view puts above the post.
+   *
+   * Walked one row at a time rather than by `rootId`, because the chain has to
+   * come back in order and with each link's own author — and the depth is
+   * bounded so a cycle, or a thread thousands deep, cannot turn one page load
+   * into an unbounded walk.
+   */
+  async ancestors(id: string, viewerId: string | null = null): Promise<PresentedPost[]> {
+    const [hidden, suspended] = await Promise.all([
+      this.social.hiddenAuthorIds(viewerId),
+      this.social.suspendedAuthorIds(),
+    ]);
+
+    const chain: PostRow[] = [];
+    const seen = new Set<string>([id]);
+    let cursor = await this.prisma.post.findFirst({
+      where: { id },
+      select: { replyToId: true },
+    });
+
+    while (cursor?.replyToId && chain.length < MAX_THREAD_DEPTH) {
+      const parentId: string = cursor.replyToId;
+      // A cycle is impossible through the interface, but a walk that trusts
+      // that is a walk that hangs if it ever stops being true.
+      if (seen.has(parentId)) break;
+      seen.add(parentId);
+
+      const parent = (await this.prisma.post.findFirst({
+        where: {
+          id: parentId,
+          deletedAt: null,
+          ...this.audienceFilter(hidden, suspended),
+        },
+        select: POST_SELECT,
+      })) as PostRow | null;
+
+      // A deleted or withheld link ends the chain rather than being skipped
+      // past: showing a reply directly under a post it is not answering would
+      // misrepresent the conversation.
+      if (!parent) break;
+
+      chain.unshift(parent);
+      cursor = { replyToId: parent.replyToId };
+    }
+
+    return Promise.all(chain.map((p) => this.present(p, viewerId)));
   }
 
   /** Direct replies, oldest first, the way a conversation reads. */

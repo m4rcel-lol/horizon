@@ -683,6 +683,9 @@ export const api = {
     }),
   followingTimeline: () => request<{ posts: ApiPost[] }>("/posts/following"),
   replies: (id: string) => request<{ posts: ApiPost[] }>(`/posts/${encodeURIComponent(id)}/replies`),
+  /** The chain of posts this one replies to, oldest first. */
+  ancestors: (id: string) =>
+    request<{ posts: ApiPost[] }>(`/posts/${encodeURIComponent(id)}/ancestors`),
   deletePost: (id: string, reason?: string) =>
     request<{ deleted: boolean }>(
       `/posts/${encodeURIComponent(id)}${reason ? `?reason=${encodeURIComponent(reason)}` : ""}`,
