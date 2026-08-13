@@ -18,7 +18,7 @@ export function SuspendedProfile({ username }: { username: string }) {
   const navigate = useNavigate();
 
   return (
-    <div className="animate-fade-in">
+    <div className="animate-page">
       <SeoHead
         title={`@${username} is suspended`}
         description="This account has been suspended on Horizon."

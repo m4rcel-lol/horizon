@@ -23,7 +23,7 @@ export function UserStatsPage() {
   const missing = error instanceof ApiError && error.status === 404;
 
   return (
-    <div className="animate-fade-in">
+    <div className="animate-page">
       <header className="x-header gap-6">
         <Link to={`/${username}`} className="icon-btn -ml-2" aria-label="Back to profile">
           <ArrowLeftIcon className="w-5 h-5" />

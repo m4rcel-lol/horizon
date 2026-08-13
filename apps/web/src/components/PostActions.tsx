@@ -47,10 +47,9 @@ function Action({
         if (disabled) return;
         onClick(event);
       }}
-      className="group flex items-center gap-1 rounded-full transition-colors"
+      className="group flex items-center gap-1 rounded-full transition-colors min-w-0"
       style={{
         minHeight: 32,
-        paddingRight: 8,
         opacity: disabled ? 0.45 : 1,
         cursor: disabled ? "not-allowed" : undefined,
         color:
@@ -178,7 +177,11 @@ export function PostActions({
 
   return (
     <div
-      className="flex justify-between max-w-[425px] mt-3"
+      // `w-full` with a cap rather than a fixed width, and `min-w-0` on the
+      // actions themselves: six touch-sized targets do not fit a 375px screen
+      // at their natural width, and without this the row pushed the page into
+      // horizontal scroll rather than distributing what space there is.
+      className="post-actions flex justify-between w-full max-w-[425px] mt-3"
       onClick={(event) => event.stopPropagation()}
     >
       <Action

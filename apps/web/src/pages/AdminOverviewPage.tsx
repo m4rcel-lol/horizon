@@ -55,7 +55,7 @@ export function AdminOverviewPage() {
   const stats = data?.stats;
 
   return (
-    <div className="animate-fade-in">
+    <div className="animate-page">
       {stats ? (
         <div className="grid gap-3 mb-6" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))" }}>
           {[
